@@ -9,6 +9,7 @@ export interface ChatMessage {
   id: string;
   role: ChatRole;
   content: string;
+  images?: string[]; // data URLs (only used on user messages)
 }
 
 interface Props {
@@ -38,8 +39,31 @@ export const MessageBubble = ({ message, streaming }: Props) => {
           </div>
 
           {isUser ? (
-            <div className="whitespace-pre-wrap text-foreground leading-relaxed">
-              {message.content}
+            <div className="space-y-3">
+              {message.images && message.images.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {message.images.map((src, i) => (
+                    <a
+                      key={i}
+                      href={src}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block overflow-hidden rounded-lg border border-border bg-surface-2 transition-transform hover:scale-[1.02]"
+                    >
+                      <img
+                        src={src}
+                        alt={`Imagine atașată ${i + 1}`}
+                        className="max-h-64 max-w-xs object-cover"
+                      />
+                    </a>
+                  ))}
+                </div>
+              )}
+              {message.content && (
+                <div className="whitespace-pre-wrap text-foreground leading-relaxed">
+                  {message.content}
+                </div>
+              )}
             </div>
           ) : (
             <div className={`buti-prose ${streaming ? "buti-caret" : ""}`}>

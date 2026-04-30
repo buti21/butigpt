@@ -1,10 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, DragEvent } from "react";
 import { Sidebar, SidebarToggleFloating, type Conversation } from "@/components/buti/Sidebar";
 import { Welcome } from "@/components/buti/Welcome";
 import { MessageBubble, type ChatMessage } from "@/components/buti/MessageBubble";
-import { ChatInput } from "@/components/buti/ChatInput";
+import { ChatInput, type AttachedImage } from "@/components/buti/ChatInput";
 import { ButiLogo } from "@/components/buti/ButiLogo";
 import { toast } from "@/hooks/use-toast";
+import { ImagePlus } from "lucide-react";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
@@ -15,16 +16,41 @@ interface ConversationState extends Conversation {
   messages: ChatMessage[];
 }
 
+const fileToDataUrl = (file: File): Promise<string> =>
+  new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result as string);
+    r.onerror = reject;
+    r.readAsDataURL(file);
+  });
+
+// Build multimodal API content for a single user turn
+const buildUserApiContent = (text: string, images: string[]) => {
+  if (images.length === 0) return text;
+  const parts: any[] = images.map((url) => ({
+    type: "image_url",
+    image_url: { url },
+  }));
+  if (text) parts.push({ type: "text", text });
+  return parts;
+};
+
 const Index = () => {
   const [conversations, setConversations] = useState<ConversationState[]>([]);
   const [activeId, setActiveId] = useState<string | null>(null);
   const [isStreaming, setIsStreaming] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [isDragging, setIsDragging] = useState(false);
+  const dragCounter = useRef(0);
 
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
+  const pendingDropRef = useRef<((files: File[]) => void) | null>(null);
 
-  // Mobile: closed by default
+  // Used by ChatInput-less drop: queue files until the input picks them up.
+  // Simpler approach: directly create attached images and send via a pending state.
+  const [pendingDropImages, setPendingDropImages] = useState<AttachedImage[]>([]);
+
   useEffect(() => {
     if (typeof window !== "undefined" && window.innerWidth < 768) {
       setSidebarOpen(false);
@@ -33,7 +59,6 @@ const Index = () => {
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
 
-  // Auto-scroll to bottom on new content
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
@@ -68,18 +93,32 @@ const Index = () => {
     setIsStreaming(false);
   };
 
-  const send = async (text: string) => {
+  const send = async (text: string, attachments: AttachedImage[] = []) => {
     let convId = activeId;
     if (!convId) convId = newConversation();
 
-    const userMsg: ChatMessage = { id: uid(), role: "user", content: text };
+    const imageUrls = attachments.map((a) => a.dataUrl);
+
+    const userMsg: ChatMessage = {
+      id: uid(),
+      role: "user",
+      content: text,
+      images: imageUrls.length ? imageUrls : undefined,
+    };
     const assistantId = uid();
 
     updateConv(convId, (c) => ({
       ...c,
-      title: c.messages.length === 0 ? text.slice(0, 40) : c.title,
+      title:
+        c.messages.length === 0
+          ? (text ? text.slice(0, 40) : `Imagine (${imageUrls.length})`)
+          : c.title,
       updatedAt: Date.now(),
-      messages: [...c.messages, userMsg, { id: assistantId, role: "assistant", content: "" }],
+      messages: [
+        ...c.messages,
+        userMsg,
+        { id: assistantId, role: "assistant", content: "" },
+      ],
     }));
 
     setIsStreaming(true);
@@ -87,10 +126,18 @@ const Index = () => {
     abortRef.current = controller;
 
     try {
-      // Build payload from latest state of this conv (include the new user msg)
       const conv = conversations.find((c) => c.id === convId);
-      const history = (conv?.messages ?? []).map((m) => ({ role: m.role, content: m.content }));
-      const payloadMessages = [...history, { role: "user", content: text }];
+      const history = (conv?.messages ?? []).map((m) => ({
+        role: m.role,
+        content:
+          m.role === "user" && m.images && m.images.length
+            ? buildUserApiContent(m.content, m.images)
+            : m.content,
+      }));
+      const payloadMessages = [
+        ...history,
+        { role: "user", content: buildUserApiContent(text, imageUrls) },
+      ];
 
       const resp = await fetch(CHAT_URL, {
         method: "POST",
@@ -104,7 +151,7 @@ const Index = () => {
 
       if (!resp.ok || !resp.body) {
         if (resp.status === 429) {
-          toast({ title: "Prea multe cereri", description: "Așteaptă câteva secunde și încearcă din nou.", variant: "destructive" });
+          toast({ title: "Prea multe cereri", description: "Așteaptă câteva secunde.", variant: "destructive" });
         } else if (resp.status === 402) {
           toast({ title: "Credit AI epuizat", description: "Adaugă fonduri în workspace-ul Lovable.", variant: "destructive" });
         } else {
@@ -170,10 +217,68 @@ const Index = () => {
     }
   };
 
+  // ===== Drag & drop on whole window =====
+  const onDragEnter = (e: DragEvent) => {
+    if (!Array.from(e.dataTransfer.types).includes("Files")) return;
+    dragCounter.current += 1;
+    setIsDragging(true);
+  };
+  const onDragLeave = () => {
+    dragCounter.current -= 1;
+    if (dragCounter.current <= 0) {
+      dragCounter.current = 0;
+      setIsDragging(false);
+    }
+  };
+  const onDragOver = (e: DragEvent) => {
+    e.preventDefault();
+  };
+  const onDrop = async (e: DragEvent) => {
+    e.preventDefault();
+    dragCounter.current = 0;
+    setIsDragging(false);
+    const files = Array.from(e.dataTransfer.files).filter((f) => f.type.startsWith("image/"));
+    if (!files.length) return;
+    const additions: AttachedImage[] = [];
+    for (const f of files) {
+      try {
+        const dataUrl = await fileToDataUrl(f);
+        additions.push({ id: uid(), dataUrl, name: f.name, size: f.size });
+      } catch {
+        /* ignore */
+      }
+    }
+    if (additions.length) {
+      setPendingDropImages((prev) => [...prev, ...additions]);
+      toast({
+        title: `${additions.length} imagine${additions.length > 1 ? "i" : ""} atașat${additions.length > 1 ? "e" : "ă"}`,
+        description: "Scrie un mesaj și apasă Enter pentru a trimite.",
+      });
+    }
+  };
+
   const messages = active?.messages ?? [];
 
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-background text-foreground">
+    <div
+      className="relative flex h-screen w-full overflow-hidden bg-background text-foreground"
+      onDragEnter={onDragEnter}
+      onDragLeave={onDragLeave}
+      onDragOver={onDragOver}
+      onDrop={onDrop}
+    >
+      {isDragging && (
+        <div className="pointer-events-none absolute inset-0 z-50 flex items-center justify-center bg-background/80 backdrop-blur-sm">
+          <div className="flex flex-col items-center gap-3 rounded-2xl border-2 border-dashed border-primary bg-surface-1 px-10 py-8 shadow-glow">
+            <ImagePlus className="h-10 w-10 text-primary" />
+            <div className="text-center">
+              <div className="text-base font-semibold">Eliberează pentru a atașa</div>
+              <div className="text-sm text-muted-foreground">Imaginile vor fi adăugate la mesaj</div>
+            </div>
+          </div>
+        </div>
+      )}
+
       <Sidebar
         conversations={conversations.map(({ messages: _m, ...rest }) => rest)}
         activeId={activeId}
@@ -224,7 +329,13 @@ const Index = () => {
           )}
         </div>
 
-        <ChatInput onSend={send} onStop={stop} isStreaming={isStreaming} />
+        <ChatInput
+          onSend={send}
+          onStop={stop}
+          isStreaming={isStreaming}
+          externalImages={pendingDropImages}
+          onConsumeExternal={() => setPendingDropImages([])}
+        />
       </main>
     </div>
   );
