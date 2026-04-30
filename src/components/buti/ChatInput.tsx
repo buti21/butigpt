@@ -20,6 +20,8 @@ interface Props {
   onStop?: () => void;
   isStreaming?: boolean;
   disabled?: boolean;
+  externalImages?: AttachedImage[];
+  onConsumeExternal?: () => void;
 }
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB per image safeguard
@@ -34,7 +36,7 @@ const fileToDataUrl = (file: File): Promise<string> =>
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
-export const ChatInput = ({ onSend, onStop, isStreaming, disabled }: Props) => {
+export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImages, onConsumeExternal }: Props) => {
   const [value, setValue] = useState("");
   const [images, setImages] = useState<AttachedImage[]>([]);
   const taRef = useRef<HTMLTextAreaElement>(null);
