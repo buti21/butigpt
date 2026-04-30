@@ -50,6 +50,14 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
     ta.style.height = Math.min(ta.scrollHeight, 240) + "px";
   }, [value]);
 
+  useEffect(() => {
+    if (externalImages && externalImages.length > 0) {
+      setImages((prev) => [...prev, ...externalImages]);
+      onConsumeExternal?.();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [externalImages]);
+
   const addFiles = async (files: FileList | File[] | null) => {
     if (!files) return;
     const arr = Array.from(files).filter((f) => f.type.startsWith("image/"));
