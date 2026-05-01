@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, KeyboardEvent, ClipboardEvent } from "react";
-import { ArrowUp, Square, Paperclip, Camera, X, ImageIcon } from "lucide-react";
+import { ArrowUp, Square, Paperclip, Camera, X, ImageIcon, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -7,6 +7,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
+import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 export interface AttachedImage {
   id: string;
@@ -39,9 +42,47 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImages, onConsumeExternal }: Props) => {
   const [value, setValue] = useState("");
   const [images, setImages] = useState<AttachedImage[]>([]);
+  const [interimText, setInterimText] = useState("");
+  const baseTextRef = useRef(""); // text in the box BEFORE we started listening this round
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  const { isListening, isSupported: micSupported, start: startMic, stop: stopMic } =
+    useSpeechRecognition({
+      lang: "ro-RO",
+      onResult: (text, isFinal) => {
+        if (isFinal) {
+          // Append finalized chunk to base, then reset interim
+          const sep = baseTextRef.current && !baseTextRef.current.endsWith(" ") ? " " : "";
+          baseTextRef.current = (baseTextRef.current + sep + text).trimStart();
+          setValue(baseTextRef.current);
+          setInterimText("");
+        } else {
+          setInterimText(text);
+        }
+      },
+    });
+
+  const toggleMic = () => {
+    if (!micSupported) {
+      toast({
+        title: "Dictarea nu e suportată",
+        description: "Folosește Chrome/Edge pe desktop sau Safari pe iOS pentru această funcție.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (isListening) {
+      stopMic();
+      setInterimText("");
+    } else {
+      // Snapshot what's currently in the textarea so finals get appended after it
+      baseTextRef.current = value;
+      setInterimText("");
+      startMic();
+    }
+  };
 
   useEffect(() => {
     const ta = taRef.current;
@@ -79,8 +120,13 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
   const submit = () => {
     const text = value.trim();
     if ((!text && images.length === 0) || isStreaming || disabled) return;
+    if (isListening) {
+      stopMic();
+      setInterimText("");
+    }
     onSend(text, images);
     setValue("");
+    baseTextRef.current = "";
     setImages([]);
   };
 
@@ -161,6 +207,23 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
               </DropdownMenuContent>
             </DropdownMenu>
 
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={toggleMic}
+              disabled={disabled}
+              className={cn(
+                "h-9 w-9 flex-shrink-0 rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground",
+                isListening &&
+                  "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary animate-pulse",
+              )}
+              aria-label={isListening ? "Oprește dictarea" : "Dictează cu vocea"}
+              title={isListening ? "Oprește dictarea" : "Dictează cu vocea"}
+            >
+              <Mic className="h-4 w-4" />
+            </Button>
+
             <input
               ref={fileInputRef}
               type="file"
@@ -221,6 +284,11 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
             )}
           </div>
         </div>
+        {isListening && (
+          <p className="mt-2 text-center text-xs text-primary">
+            🎙️ Te ascult{interimText ? `: „${interimText}"` : "…"}
+          </p>
+        )}
         <p className="mt-2 text-center text-xs text-muted-foreground">
           ButiGPT poate face greșeli. Verifică informațiile importante.
         </p>
