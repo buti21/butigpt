@@ -284,6 +284,11 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
             )}
           </div>
         </div>
+        {isListening && (
+          <p className="mt-2 text-center text-xs text-primary">
+            🎙️ Te ascult{interimText ? `: „${interimText}"` : "…"}
+          </p>
+        )}
         <p className="mt-2 text-center text-xs text-muted-foreground">
           ButiGPT poate face greșeli. Verifică informațiile importante.
         </p>
