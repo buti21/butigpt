@@ -190,6 +190,21 @@ const Index = () => {
           }
           try {
             const parsed = JSON.parse(json);
+
+            // Custom event: generated image
+            if (parsed.buti_image?.url) {
+              const url = parsed.buti_image.url as string;
+              updateConv(convId!, (c) => ({
+                ...c,
+                messages: c.messages.map((m) =>
+                  m.id === assistantId
+                    ? { ...m, images: [...(m.images ?? []), url] }
+                    : m,
+                ),
+              }));
+              continue;
+            }
+
             const delta = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (delta) {
               assembled += delta;
