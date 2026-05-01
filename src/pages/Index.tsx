@@ -426,7 +426,7 @@ const Index = () => {
           </div>
         </header>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin">
+        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto scrollbar-thin">
           {messages.length === 0 ? (
             <Welcome onPick={(p) => send(p)} />
           ) : (
