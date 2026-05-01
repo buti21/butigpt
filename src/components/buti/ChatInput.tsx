@@ -120,8 +120,13 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
   const submit = () => {
     const text = value.trim();
     if ((!text && images.length === 0) || isStreaming || disabled) return;
+    if (isListening) {
+      stopMic();
+      setInterimText("");
+    }
     onSend(text, images);
     setValue("");
+    baseTextRef.current = "";
     setImages([]);
   };
 
