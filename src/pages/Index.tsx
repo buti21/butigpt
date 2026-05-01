@@ -8,7 +8,12 @@ import { toast } from "@/hooks/use-toast";
 import { ImagePlus } from "lucide-react";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
+const TITLE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/title`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+
+// Typewriter pacing — characters streamed per tick
+const TYPEWRITER_CHARS_PER_TICK = 2;
+const TYPEWRITER_INTERVAL_MS = 18;
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -45,10 +50,9 @@ const Index = () => {
 
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const pendingDropRef = useRef<((files: File[]) => void) | null>(null);
+  const stickToBottomRef = useRef(true);
 
   // Used by ChatInput-less drop: queue files until the input picks them up.
-  // Simpler approach: directly create attached images and send via a pending state.
   const [pendingDropImages, setPendingDropImages] = useState<AttachedImage[]>([]);
 
   useEffect(() => {
@@ -59,10 +63,20 @@ const Index = () => {
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
 
+  // Track whether user is near bottom — if not, don't auto-scroll
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = distance < 80;
+  };
+
+  // Auto-scroll only if user is near bottom (no smooth during streaming for perf)
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    if (!stickToBottomRef.current) return;
+    el.scrollTop = el.scrollHeight;
   }, [active?.messages.length, active?.messages[active.messages.length - 1]?.content]);
 
   const newConversation = (): string => {
@@ -93,6 +107,27 @@ const Index = () => {
     setIsStreaming(false);
   };
 
+  const generateTitle = async (convId: string, userMessage: string, assistantMessage: string) => {
+    try {
+      const resp = await fetch(TITLE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${ANON_KEY}`,
+        },
+        body: JSON.stringify({ userMessage, assistantMessage }),
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const title = (data?.title as string | null)?.trim();
+      if (title) {
+        updateConv(convId, (c) => ({ ...c, title }));
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
   const send = async (text: string, attachments: AttachedImage[] = []) => {
     let convId = activeId;
     if (!convId) convId = newConversation();
@@ -107,23 +142,63 @@ const Index = () => {
     };
     const assistantId = uid();
 
-    updateConv(convId, (c) => ({
-      ...c,
-      title:
-        c.messages.length === 0
-          ? (text ? text.slice(0, 40) : `Imagine (${imageUrls.length})`)
-          : c.title,
-      updatedAt: Date.now(),
-      messages: [
-        ...c.messages,
-        userMsg,
-        { id: assistantId, role: "assistant", content: "" },
-      ],
-    }));
+    // Snapshot whether this is the first exchange — used to trigger title gen
+    let isFirstExchange = false;
+
+    updateConv(convId, (c) => {
+      isFirstExchange = c.messages.length === 0;
+      return {
+        ...c,
+        title:
+          c.messages.length === 0
+            ? (text ? text.slice(0, 40) : `Imagine (${imageUrls.length})`)
+            : c.title,
+        updatedAt: Date.now(),
+        messages: [
+          ...c.messages,
+          userMsg,
+          { id: assistantId, role: "assistant", content: "" },
+        ],
+      };
+    });
+
+    // When user sends a new message, force scroll to bottom
+    stickToBottomRef.current = true;
 
     setIsStreaming(true);
     const controller = new AbortController();
     abortRef.current = controller;
+
+    // ===== Typewriter buffer: chars arrive into `target`, get drained slowly into UI =====
+    let target = "";
+    let displayed = "";
+    let typewriterTimer: number | null = null;
+    let streamFinished = false;
+
+    const flushTypewriter = () => {
+      if (typewriterTimer !== null) return;
+      typewriterTimer = window.setInterval(() => {
+        if (displayed.length >= target.length) {
+          if (streamFinished) {
+            window.clearInterval(typewriterTimer!);
+            typewriterTimer = null;
+          }
+          return;
+        }
+        const next = Math.min(
+          displayed.length + TYPEWRITER_CHARS_PER_TICK,
+          target.length,
+        );
+        displayed = target.slice(0, next);
+        const snapshot = displayed;
+        updateConv(convId!, (c) => ({
+          ...c,
+          messages: c.messages.map((m) =>
+            m.id === assistantId ? { ...m, content: snapshot } : m,
+          ),
+        }));
+      }, TYPEWRITER_INTERVAL_MS);
+    };
 
     try {
       const conv = conversations.find((c) => c.id === convId);
@@ -165,10 +240,11 @@ const Index = () => {
         return;
       }
 
+      flushTypewriter();
+
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let assembled = "";
       let done = false;
 
       while (!done) {
@@ -191,7 +267,7 @@ const Index = () => {
           try {
             const parsed = JSON.parse(json);
 
-            // Custom event: generated image
+            // Custom event: generated image — bypass typewriter
             if (parsed.buti_image?.url) {
               const url = parsed.buti_image.url as string;
               updateConv(convId!, (c) => ({
@@ -207,13 +283,7 @@ const Index = () => {
 
             const delta = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (delta) {
-              assembled += delta;
-              updateConv(convId!, (c) => ({
-                ...c,
-                messages: c.messages.map((m) =>
-                  m.id === assistantId ? { ...m, content: assembled } : m,
-                ),
-              }));
+              target += delta;
             }
           } catch {
             buffer = line + "\n" + buffer;
@@ -221,12 +291,44 @@ const Index = () => {
           }
         }
       }
+
+      // Mark stream done — typewriter will stop after draining
+      streamFinished = true;
+
+      // Wait for typewriter to fully drain before clearing streaming state
+      await new Promise<void>((resolve) => {
+        const check = window.setInterval(() => {
+          if (displayed.length >= target.length) {
+            window.clearInterval(check);
+            resolve();
+          }
+        }, 30);
+      });
+
+      // Trigger title generation after first exchange completes
+      if (isFirstExchange && target.trim()) {
+        generateTitle(convId!, text, target);
+      }
     } catch (e: any) {
       if (e?.name !== "AbortError") {
         console.error(e);
         toast({ title: "Eroare de rețea", description: "Verifică conexiunea și reîncearcă.", variant: "destructive" });
       }
+      // On abort, snap to whatever we have
+      streamFinished = true;
+      if (target.length > displayed.length) {
+        const snap = target;
+        updateConv(convId!, (c) => ({
+          ...c,
+          messages: c.messages.map((m) =>
+            m.id === assistantId ? { ...m, content: snap } : m,
+          ),
+        }));
+      }
     } finally {
+      if (typewriterTimer !== null) {
+        window.clearInterval(typewriterTimer);
+      }
       setIsStreaming(false);
       abortRef.current = null;
     }
@@ -324,7 +426,7 @@ const Index = () => {
           </div>
         </header>
 
-        <div ref={scrollRef} className="flex-1 overflow-y-auto scrollbar-thin">
+        <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto scrollbar-thin">
           {messages.length === 0 ? (
             <Welcome onPick={(p) => send(p)} />
           ) : (
