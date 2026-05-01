@@ -9,7 +9,7 @@ export interface ChatMessage {
   id: string;
   role: ChatRole;
   content: string;
-  images?: string[]; // data URLs (only used on user messages)
+  images?: string[]; // attached images (user) or generated images (assistant)
 }
 
 interface Props {
