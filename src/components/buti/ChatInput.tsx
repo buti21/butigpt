@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, KeyboardEvent, ClipboardEvent } from "react";
-import { ArrowUp, Square, Paperclip, Camera, X, ImageIcon } from "lucide-react";
+import { ArrowUp, Square, Paperclip, Camera, X, ImageIcon, Mic } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -7,6 +7,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
+import { toast } from "@/hooks/use-toast";
+import { cn } from "@/lib/utils";
 
 export interface AttachedImage {
   id: string;
