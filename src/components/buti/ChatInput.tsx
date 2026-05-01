@@ -42,9 +42,47 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImages, onConsumeExternal }: Props) => {
   const [value, setValue] = useState("");
   const [images, setImages] = useState<AttachedImage[]>([]);
+  const [interimText, setInterimText] = useState("");
+  const baseTextRef = useRef(""); // text in the box BEFORE we started listening this round
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+
+  const { isListening, isSupported: micSupported, start: startMic, stop: stopMic } =
+    useSpeechRecognition({
+      lang: "ro-RO",
+      onResult: (text, isFinal) => {
+        if (isFinal) {
+          // Append finalized chunk to base, then reset interim
+          const sep = baseTextRef.current && !baseTextRef.current.endsWith(" ") ? " " : "";
+          baseTextRef.current = (baseTextRef.current + sep + text).trimStart();
+          setValue(baseTextRef.current);
+          setInterimText("");
+        } else {
+          setInterimText(text);
+        }
+      },
+    });
+
+  const toggleMic = () => {
+    if (!micSupported) {
+      toast({
+        title: "Dictarea nu e suportată",
+        description: "Folosește Chrome/Edge pe desktop sau Safari pe iOS pentru această funcție.",
+        variant: "destructive",
+      });
+      return;
+    }
+    if (isListening) {
+      stopMic();
+      setInterimText("");
+    } else {
+      // Snapshot what's currently in the textarea so finals get appended after it
+      baseTextRef.current = value;
+      setInterimText("");
+      startMic();
+    }
+  };
 
   useEffect(() => {
     const ta = taRef.current;
