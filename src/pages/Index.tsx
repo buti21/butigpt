@@ -8,7 +8,12 @@ import { toast } from "@/hooks/use-toast";
 import { ImagePlus } from "lucide-react";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
+const TITLE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/title`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+
+// Typewriter pacing — characters streamed per tick
+const TYPEWRITER_CHARS_PER_TICK = 2;
+const TYPEWRITER_INTERVAL_MS = 18;
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
