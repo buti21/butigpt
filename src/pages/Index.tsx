@@ -50,10 +50,9 @@ const Index = () => {
 
   const abortRef = useRef<AbortController | null>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
-  const pendingDropRef = useRef<((files: File[]) => void) | null>(null);
+  const stickToBottomRef = useRef(true);
 
   // Used by ChatInput-less drop: queue files until the input picks them up.
-  // Simpler approach: directly create attached images and send via a pending state.
   const [pendingDropImages, setPendingDropImages] = useState<AttachedImage[]>([]);
 
   useEffect(() => {
@@ -64,10 +63,20 @@ const Index = () => {
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
 
+  // Track whether user is near bottom — if not, don't auto-scroll
+  const handleScroll = () => {
+    const el = scrollRef.current;
+    if (!el) return;
+    const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
+    stickToBottomRef.current = distance < 80;
+  };
+
+  // Auto-scroll only if user is near bottom (no smooth during streaming for perf)
   useEffect(() => {
     const el = scrollRef.current;
     if (!el) return;
-    el.scrollTo({ top: el.scrollHeight, behavior: "smooth" });
+    if (!stickToBottomRef.current) return;
+    el.scrollTop = el.scrollHeight;
   }, [active?.messages.length, active?.messages[active.messages.length - 1]?.content]);
 
   const newConversation = (): string => {
