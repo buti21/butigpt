@@ -66,10 +66,31 @@ export const MessageBubble = ({ message, streaming }: Props) => {
               )}
             </div>
           ) : (
-            <div className={`buti-prose ${streaming ? "buti-caret" : ""}`}>
-              <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                {message.content || (streaming ? "" : "…")}
-              </ReactMarkdown>
+            <div className="space-y-3">
+              <div className={`buti-prose ${streaming ? "buti-caret" : ""}`}>
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {message.content || (streaming ? "" : "…")}
+                </ReactMarkdown>
+              </div>
+              {message.images && message.images.length > 0 && (
+                <div className="flex flex-wrap gap-3">
+                  {message.images.map((src, i) => (
+                    <a
+                      key={i}
+                      href={src}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="block overflow-hidden rounded-xl border border-border bg-surface-2 shadow-soft transition-transform hover:scale-[1.01]"
+                    >
+                      <img
+                        src={src}
+                        alt={`Imagine generată ${i + 1}`}
+                        className="max-h-96 max-w-md object-contain"
+                      />
+                    </a>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>
