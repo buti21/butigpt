@@ -207,6 +207,23 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
               </DropdownMenuContent>
             </DropdownMenu>
 
+            <Button
+              type="button"
+              size="icon"
+              variant="ghost"
+              onClick={toggleMic}
+              disabled={disabled}
+              className={cn(
+                "h-9 w-9 flex-shrink-0 rounded-xl text-muted-foreground hover:bg-secondary hover:text-foreground",
+                isListening &&
+                  "bg-primary/15 text-primary hover:bg-primary/20 hover:text-primary animate-pulse",
+              )}
+              aria-label={isListening ? "Oprește dictarea" : "Dictează cu vocea"}
+              title={isListening ? "Oprește dictarea" : "Dictează cu vocea"}
+            >
+              <Mic className="h-4 w-4" />
+            </Button>
+
             <input
               ref={fileInputRef}
               type="file"
