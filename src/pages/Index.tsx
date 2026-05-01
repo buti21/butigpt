@@ -107,6 +107,27 @@ const Index = () => {
     setIsStreaming(false);
   };
 
+  const generateTitle = async (convId: string, userMessage: string, assistantMessage: string) => {
+    try {
+      const resp = await fetch(TITLE_URL, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${ANON_KEY}`,
+        },
+        body: JSON.stringify({ userMessage, assistantMessage }),
+      });
+      if (!resp.ok) return;
+      const data = await resp.json();
+      const title = (data?.title as string | null)?.trim();
+      if (title) {
+        updateConv(convId, (c) => ({ ...c, title }));
+      }
+    } catch {
+      /* ignore */
+    }
+  };
+
   const send = async (text: string, attachments: AttachedImage[] = []) => {
     let convId = activeId;
     if (!convId) convId = newConversation();
@@ -121,23 +142,63 @@ const Index = () => {
     };
     const assistantId = uid();
 
-    updateConv(convId, (c) => ({
-      ...c,
-      title:
-        c.messages.length === 0
-          ? (text ? text.slice(0, 40) : `Imagine (${imageUrls.length})`)
-          : c.title,
-      updatedAt: Date.now(),
-      messages: [
-        ...c.messages,
-        userMsg,
-        { id: assistantId, role: "assistant", content: "" },
-      ],
-    }));
+    // Snapshot whether this is the first exchange — used to trigger title gen
+    let isFirstExchange = false;
+
+    updateConv(convId, (c) => {
+      isFirstExchange = c.messages.length === 0;
+      return {
+        ...c,
+        title:
+          c.messages.length === 0
+            ? (text ? text.slice(0, 40) : `Imagine (${imageUrls.length})`)
+            : c.title,
+        updatedAt: Date.now(),
+        messages: [
+          ...c.messages,
+          userMsg,
+          { id: assistantId, role: "assistant", content: "" },
+        ],
+      };
+    });
+
+    // When user sends a new message, force scroll to bottom
+    stickToBottomRef.current = true;
 
     setIsStreaming(true);
     const controller = new AbortController();
     abortRef.current = controller;
+
+    // ===== Typewriter buffer: chars arrive into `target`, get drained slowly into UI =====
+    let target = "";
+    let displayed = "";
+    let typewriterTimer: number | null = null;
+    let streamFinished = false;
+
+    const flushTypewriter = () => {
+      if (typewriterTimer !== null) return;
+      typewriterTimer = window.setInterval(() => {
+        if (displayed.length >= target.length) {
+          if (streamFinished) {
+            window.clearInterval(typewriterTimer!);
+            typewriterTimer = null;
+          }
+          return;
+        }
+        const next = Math.min(
+          displayed.length + TYPEWRITER_CHARS_PER_TICK,
+          target.length,
+        );
+        displayed = target.slice(0, next);
+        const snapshot = displayed;
+        updateConv(convId!, (c) => ({
+          ...c,
+          messages: c.messages.map((m) =>
+            m.id === assistantId ? { ...m, content: snapshot } : m,
+          ),
+        }));
+      }, TYPEWRITER_INTERVAL_MS);
+    };
 
     try {
       const conv = conversations.find((c) => c.id === convId);
@@ -179,10 +240,11 @@ const Index = () => {
         return;
       }
 
+      flushTypewriter();
+
       const reader = resp.body.getReader();
       const decoder = new TextDecoder();
       let buffer = "";
-      let assembled = "";
       let done = false;
 
       while (!done) {
@@ -205,7 +267,7 @@ const Index = () => {
           try {
             const parsed = JSON.parse(json);
 
-            // Custom event: generated image
+            // Custom event: generated image — bypass typewriter
             if (parsed.buti_image?.url) {
               const url = parsed.buti_image.url as string;
               updateConv(convId!, (c) => ({
@@ -221,13 +283,7 @@ const Index = () => {
 
             const delta = parsed.choices?.[0]?.delta?.content as string | undefined;
             if (delta) {
-              assembled += delta;
-              updateConv(convId!, (c) => ({
-                ...c,
-                messages: c.messages.map((m) =>
-                  m.id === assistantId ? { ...m, content: assembled } : m,
-                ),
-              }));
+              target += delta;
             }
           } catch {
             buffer = line + "\n" + buffer;
@@ -235,12 +291,44 @@ const Index = () => {
           }
         }
       }
+
+      // Mark stream done — typewriter will stop after draining
+      streamFinished = true;
+
+      // Wait for typewriter to fully drain before clearing streaming state
+      await new Promise<void>((resolve) => {
+        const check = window.setInterval(() => {
+          if (displayed.length >= target.length) {
+            window.clearInterval(check);
+            resolve();
+          }
+        }, 30);
+      });
+
+      // Trigger title generation after first exchange completes
+      if (isFirstExchange && target.trim()) {
+        generateTitle(convId!, text, target);
+      }
     } catch (e: any) {
       if (e?.name !== "AbortError") {
         console.error(e);
         toast({ title: "Eroare de rețea", description: "Verifică conexiunea și reîncearcă.", variant: "destructive" });
       }
+      // On abort, snap to whatever we have
+      streamFinished = true;
+      if (target.length > displayed.length) {
+        const snap = target;
+        updateConv(convId!, (c) => ({
+          ...c,
+          messages: c.messages.map((m) =>
+            m.id === assistantId ? { ...m, content: snap } : m,
+          ),
+        }));
+      }
     } finally {
+      if (typewriterTimer !== null) {
+        window.clearInterval(typewriterTimer);
+      }
       setIsStreaming(false);
       abortRef.current = null;
     }
