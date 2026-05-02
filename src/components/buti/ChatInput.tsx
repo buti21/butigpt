@@ -59,11 +59,14 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImages, onConsumeExternal }: Props) => {
   const [value, setValue] = useState("");
   const [images, setImages] = useState<AttachedImage[]>([]);
+  const [files, setFiles] = useState<AttachedFile[]>([]);
+  const [parsingCount, setParsingCount] = useState(0);
   const [interimText, setInterimText] = useState("");
   const baseTextRef = useRef(""); // text in the box BEFORE we started listening this round
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   const { isListening, isSupported: micSupported, start: startMic, stop: stopMic } =
     useSpeechRecognition({
@@ -116,11 +119,14 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalImages]);
 
-  const addFiles = async (files: FileList | File[] | null) => {
-    if (!files) return;
-    const arr = Array.from(files).filter((f) => f.type.startsWith("image/"));
+  const addFiles = async (incoming: FileList | File[] | null) => {
+    if (!incoming) return;
+    const all = Array.from(incoming);
+    const imgs = all.filter((f) => f.type.startsWith("image/"));
+    const docs = all.filter((f) => !f.type.startsWith("image/"));
+
     const additions: AttachedImage[] = [];
-    for (const f of arr) {
+    for (const f of imgs) {
       if (f.size > MAX_IMAGE_BYTES) continue;
       try {
         const dataUrl = await fileToDataUrl(f);
@@ -130,21 +136,63 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
       }
     }
     if (additions.length) setImages((prev) => [...prev, ...additions]);
+
+    if (docs.length) {
+      setParsingCount((c) => c + docs.length);
+      for (const f of docs) {
+        if (f.size > MAX_FILE_BYTES) {
+          toast({
+            title: "Fișier prea mare",
+            description: `${f.name} depășește 20MB.`,
+            variant: "destructive",
+          });
+          setParsingCount((c) => c - 1);
+          continue;
+        }
+        try {
+          const parsed = await parseFile(f);
+          if (!parsed.text.trim()) {
+            toast({
+              title: "Nu am putut citi fișierul",
+              description: `Conținutul din ${f.name} nu a putut fi extras (format binar nesuportat?).`,
+              variant: "destructive",
+            });
+          } else {
+            setFiles((prev) => [...prev, { id: uid(), parsed }]);
+          }
+        } catch (e) {
+          console.error(e);
+          toast({
+            title: "Eroare la citirea fișierului",
+            description: f.name,
+            variant: "destructive",
+          });
+        } finally {
+          setParsingCount((c) => c - 1);
+        }
+      }
+    }
   };
 
   const removeImage = (id: string) => setImages((p) => p.filter((i) => i.id !== id));
+  const removeFile = (id: string) => setFiles((p) => p.filter((i) => i.id !== id));
 
   const submit = () => {
     const text = value.trim();
-    if ((!text && images.length === 0) || isStreaming || disabled) return;
+    if ((!text && images.length === 0 && files.length === 0) || isStreaming || disabled) return;
+    if (parsingCount > 0) {
+      toast({ title: "Mai aștept fișierele", description: "Se citesc atașamentele…" });
+      return;
+    }
     if (isListening) {
       stopMic();
       setInterimText("");
     }
-    onSend(text, images);
+    onSend(text, images, files);
     setValue("");
     baseTextRef.current = "";
     setImages([]);
+    setFiles([]);
   };
 
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
