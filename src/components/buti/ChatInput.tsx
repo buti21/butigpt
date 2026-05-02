@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState, KeyboardEvent, ClipboardEvent } from "react";
-import { ArrowUp, Square, Paperclip, Camera, X, ImageIcon, Mic } from "lucide-react";
+import {
+  ArrowUp,
+  Square,
+  Paperclip,
+  Camera,
+  X,
+  ImageIcon,
+  Mic,
+  FileText,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { toast } from "@/hooks/use-toast";
+import { parseFile, type ParsedFile } from "@/lib/parseFile";
 import { cn } from "@/lib/utils";
 
 export interface AttachedImage {
@@ -18,8 +29,13 @@ export interface AttachedImage {
   size: number;
 }
 
+export interface AttachedFile {
+  id: string;
+  parsed: ParsedFile;
+}
+
 interface Props {
-  onSend: (text: string, images: AttachedImage[]) => void;
+  onSend: (text: string, images: AttachedImage[], files: AttachedFile[]) => void;
   onStop?: () => void;
   isStreaming?: boolean;
   disabled?: boolean;
@@ -28,6 +44,7 @@ interface Props {
 }
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB per image safeguard
+const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB per document
 
 const fileToDataUrl = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
@@ -42,11 +59,14 @@ const uid = () => Math.random().toString(36).slice(2, 10);
 export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImages, onConsumeExternal }: Props) => {
   const [value, setValue] = useState("");
   const [images, setImages] = useState<AttachedImage[]>([]);
+  const [files, setFiles] = useState<AttachedFile[]>([]);
+  const [parsingCount, setParsingCount] = useState(0);
   const [interimText, setInterimText] = useState("");
   const baseTextRef = useRef(""); // text in the box BEFORE we started listening this round
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const cameraInputRef = useRef<HTMLInputElement>(null);
+  const docInputRef = useRef<HTMLInputElement>(null);
 
   const { isListening, isSupported: micSupported, start: startMic, stop: stopMic } =
     useSpeechRecognition({
@@ -99,11 +119,14 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [externalImages]);
 
-  const addFiles = async (files: FileList | File[] | null) => {
-    if (!files) return;
-    const arr = Array.from(files).filter((f) => f.type.startsWith("image/"));
+  const addFiles = async (incoming: FileList | File[] | null) => {
+    if (!incoming) return;
+    const all = Array.from(incoming);
+    const imgs = all.filter((f) => f.type.startsWith("image/"));
+    const docs = all.filter((f) => !f.type.startsWith("image/"));
+
     const additions: AttachedImage[] = [];
-    for (const f of arr) {
+    for (const f of imgs) {
       if (f.size > MAX_IMAGE_BYTES) continue;
       try {
         const dataUrl = await fileToDataUrl(f);
@@ -113,21 +136,63 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
       }
     }
     if (additions.length) setImages((prev) => [...prev, ...additions]);
+
+    if (docs.length) {
+      setParsingCount((c) => c + docs.length);
+      for (const f of docs) {
+        if (f.size > MAX_FILE_BYTES) {
+          toast({
+            title: "Fișier prea mare",
+            description: `${f.name} depășește 20MB.`,
+            variant: "destructive",
+          });
+          setParsingCount((c) => c - 1);
+          continue;
+        }
+        try {
+          const parsed = await parseFile(f);
+          if (!parsed.text.trim()) {
+            toast({
+              title: "Nu am putut citi fișierul",
+              description: `Conținutul din ${f.name} nu a putut fi extras (format binar nesuportat?).`,
+              variant: "destructive",
+            });
+          } else {
+            setFiles((prev) => [...prev, { id: uid(), parsed }]);
+          }
+        } catch (e) {
+          console.error(e);
+          toast({
+            title: "Eroare la citirea fișierului",
+            description: f.name,
+            variant: "destructive",
+          });
+        } finally {
+          setParsingCount((c) => c - 1);
+        }
+      }
+    }
   };
 
   const removeImage = (id: string) => setImages((p) => p.filter((i) => i.id !== id));
+  const removeFile = (id: string) => setFiles((p) => p.filter((i) => i.id !== id));
 
   const submit = () => {
     const text = value.trim();
-    if ((!text && images.length === 0) || isStreaming || disabled) return;
+    if ((!text && images.length === 0 && files.length === 0) || isStreaming || disabled) return;
+    if (parsingCount > 0) {
+      toast({ title: "Mai aștept fișierele", description: "Se citesc atașamentele…" });
+      return;
+    }
     if (isListening) {
       stopMic();
       setInterimText("");
     }
-    onSend(text, images);
+    onSend(text, images, files);
     setValue("");
     baseTextRef.current = "";
     setImages([]);
+    setFiles([]);
   };
 
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
@@ -181,6 +246,46 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
             </div>
           )}
 
+          {(files.length > 0 || parsingCount > 0) && (
+            <div className="flex flex-wrap gap-2 border-b border-border px-3 pt-3 pb-2">
+              {files.map((f) => (
+                <div
+                  key={f.id}
+                  className="group relative flex items-center gap-2 rounded-lg border border-border bg-surface-2 py-2 pl-2 pr-7 max-w-[16rem]"
+                  title={`${f.parsed.kind} • ${(f.parsed.size / 1024).toFixed(0)} KB${
+                    f.parsed.truncated ? " • truncat" : ""
+                  }`}
+                >
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium text-foreground">
+                      {f.parsed.name}
+                    </div>
+                    <div className="truncate text-[10px] text-muted-foreground">
+                      {f.parsed.kind}
+                      {f.parsed.truncated ? " • truncat" : ""}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => removeFile(f.id)}
+                    className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-background/90 text-foreground opacity-0 shadow transition-opacity hover:bg-destructive hover:text-destructive-foreground group-hover:opacity-100"
+                    aria-label="Elimină fișierul"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {parsingCount > 0 && (
+                <div className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-surface-2 px-3 py-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Se citește fișierul…
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-end gap-1.5 p-2 pl-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -195,7 +300,7 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
                   <Paperclip className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top" className="w-52">
+              <DropdownMenuContent align="start" side="top" className="w-56">
                 <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
                   <ImageIcon className="mr-2 h-4 w-4" />
                   Încarcă imagini
@@ -203,6 +308,10 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
                 <DropdownMenuItem onClick={() => cameraInputRef.current?.click()}>
                   <Camera className="mr-2 h-4 w-4" />
                   Fă o poză
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => docInputRef.current?.click()}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Încarcă fișier (PDF, Word…)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -246,6 +355,17 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
                 e.target.value = "";
               }}
             />
+            <input
+              ref={docInputRef}
+              type="file"
+              accept=".pdf,.docx,.pptx,.xlsx,.xlsm,.txt,.md,.csv,.tsv,.json,.html,.htm,.xml,.rtf,.log,.yml,.yaml"
+              multiple
+              hidden
+              onChange={(e) => {
+                addFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
 
             <textarea
               ref={taRef}
@@ -275,7 +395,7 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
                 type="button"
                 size="icon"
                 onClick={submit}
-                disabled={(!value.trim() && images.length === 0) || disabled}
+                disabled={(!value.trim() && images.length === 0 && files.length === 0) || disabled || parsingCount > 0}
                 className="h-9 w-9 flex-shrink-0 rounded-xl bg-gradient-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:bg-secondary disabled:bg-none"
                 aria-label="Trimite"
               >

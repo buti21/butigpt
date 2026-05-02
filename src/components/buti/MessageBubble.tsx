@@ -1,11 +1,17 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ButiLogo } from "./ButiLogo";
-import { User, Copy, Check, Volume2, Loader2, Square } from "lucide-react";
+import { User, Copy, Check, Volume2, Loader2, Square, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTTS } from "@/hooks/use-tts";
 import { toast } from "@/hooks/use-toast";
+import {
+  buildPresentation,
+  downloadBlob,
+  safeFilename,
+  type PresentationSpec,
+} from "@/lib/pptx";
 
 export type ChatRole = "user" | "assistant";
 
@@ -14,6 +20,7 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
   images?: string[];
+  presentation?: PresentationSpec;
 }
 
 interface Props {
@@ -99,11 +106,15 @@ export const MessageBubble = ({ message, streaming }: Props) => {
             </div>
           ) : (
             <div className="space-y-3">
-              <div className={`buti-prose ${streaming ? "buti-caret" : ""}`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {message.content || (streaming ? "" : "…")}
-                </ReactMarkdown>
-              </div>
+              {streaming && !message.content ? (
+                <ThinkingIndicator />
+              ) : (
+                <div className={`buti-prose ${streaming ? "buti-caret" : ""}`}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {message.content || "…"}
+                  </ReactMarkdown>
+                </div>
+              )}
               {message.images && message.images.length > 0 && (
                 <div className="flex flex-wrap gap-3">
                   {message.images.map((src, i) => (
@@ -122,6 +133,9 @@ export const MessageBubble = ({ message, streaming }: Props) => {
                     </a>
                   ))}
                 </div>
+              )}
+              {message.presentation && !streaming && (
+                <PresentationCard spec={message.presentation} />
               )}
             </div>
           )}
@@ -167,6 +181,74 @@ export const MessageBubble = ({ message, streaming }: Props) => {
           )}
         </div>
       </div>
+    </div>
+  );
+};
+
+const ThinkingIndicator = () => {
+  const [dots, setDots] = useState(1);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setDots((d) => (d >= 3 ? 1 : d + 1));
+    }, 400);
+    return () => window.clearInterval(id);
+  }, []);
+  return (
+    <div className="flex items-center text-muted-foreground italic select-none">
+      <span>Se gândește</span>
+      <span className="ml-0.5 inline-block w-6 text-left">{".".repeat(dots)}</span>
+    </div>
+  );
+};
+
+const PresentationCard = ({ spec }: { spec: PresentationSpec }) => {
+  const [busy, setBusy] = useState(false);
+  const handleDownload = async () => {
+    setBusy(true);
+    try {
+      const blob = await buildPresentation(spec);
+      downloadBlob(blob, `${safeFilename(spec.title)}.pptx`);
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: "Nu am putut crea prezentarea",
+        description: "Încearcă din nou.",
+        variant: "destructive",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const slideCount = spec.slides?.length ?? 0;
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-2 p-3 shadow-soft">
+      <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground">
+        <Download className="h-5 w-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-semibold text-foreground">
+          {spec.title}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Prezentare PowerPoint • {slideCount} slide{slideCount === 1 ? "" : "-uri"}
+        </div>
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        onClick={handleDownload}
+        disabled={busy}
+        className="flex-shrink-0 rounded-lg bg-gradient-primary text-primary-foreground hover:opacity-90"
+      >
+        {busy ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <>
+            <Download className="mr-1.5 h-4 w-4" />
+            Descarcă
+          </>
+        )}
+      </Button>
     </div>
   );
 };

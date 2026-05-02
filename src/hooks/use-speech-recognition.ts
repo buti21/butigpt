@@ -14,6 +14,10 @@ export function useSpeechRecognition(opts: UseSpeechRecognitionOptions = {}) {
   const [isSupported, setIsSupported] = useState(false);
   const recRef = useRef<SpeechRecognitionLike | null>(null);
   const onResultRef = useRef(onResult);
+  // Track which final results we've already delivered to the caller, so the
+  // browser re-emitting the same final result (common on Chrome) doesn't cause
+  // duplicate words.
+  const processedFinalIndexRef = useRef(0);
 
   useEffect(() => {
     onResultRef.current = onResult;
@@ -43,16 +47,32 @@ export function useSpeechRecognition(opts: UseSpeechRecognitionOptions = {}) {
     rec.continuous = true;
     rec.interimResults = true;
 
+    // Reset for a fresh session
+    processedFinalIndexRef.current = 0;
+
     rec.onresult = (event: any) => {
       let interim = "";
-      let final = "";
-      for (let i = event.resultIndex; i < event.results.length; i++) {
+      let newFinal = "";
+
+      // Walk through ALL results; only emit finals whose index we haven't
+      // processed yet. Interim text is always rebuilt from scratch (current
+      // un-finalized portion).
+      for (let i = 0; i < event.results.length; i++) {
         const res = event.results[i];
-        if (res.isFinal) final += res[0].transcript;
-        else interim += res[0].transcript;
+        const transcript: string = res[0]?.transcript ?? "";
+        if (res.isFinal) {
+          if (i >= processedFinalIndexRef.current) {
+            newFinal += transcript;
+            processedFinalIndexRef.current = i + 1;
+          }
+        } else {
+          interim += transcript;
+        }
       }
-      if (final) onResultRef.current?.(final, true);
-      else if (interim) onResultRef.current?.(interim, false);
+
+      if (newFinal) onResultRef.current?.(newFinal, true);
+      // Always update interim (may be empty when nothing pending)
+      onResultRef.current?.(interim, false);
     };
 
     rec.onerror = () => {
