@@ -355,6 +355,17 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
                 e.target.value = "";
               }}
             />
+            <input
+              ref={docInputRef}
+              type="file"
+              accept=".pdf,.docx,.pptx,.xlsx,.xlsm,.txt,.md,.csv,.tsv,.json,.html,.htm,.xml,.rtf,.log,.yml,.yaml"
+              multiple
+              hidden
+              onChange={(e) => {
+                addFiles(e.target.files);
+                e.target.value = "";
+              }}
+            />
 
             <textarea
               ref={taRef}
@@ -384,7 +395,7 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
                 type="button"
                 size="icon"
                 onClick={submit}
-                disabled={(!value.trim() && images.length === 0) || disabled}
+                disabled={(!value.trim() && images.length === 0 && files.length === 0) || disabled || parsingCount > 0}
                 className="h-9 w-9 flex-shrink-0 rounded-xl bg-gradient-primary text-primary-foreground hover:opacity-90 disabled:opacity-40 disabled:bg-secondary disabled:bg-none"
                 aria-label="Trimite"
               >
