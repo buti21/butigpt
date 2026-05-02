@@ -246,6 +246,46 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
             </div>
           )}
 
+          {(files.length > 0 || parsingCount > 0) && (
+            <div className="flex flex-wrap gap-2 border-b border-border px-3 pt-3 pb-2">
+              {files.map((f) => (
+                <div
+                  key={f.id}
+                  className="group relative flex items-center gap-2 rounded-lg border border-border bg-surface-2 py-2 pl-2 pr-7 max-w-[16rem]"
+                  title={`${f.parsed.kind} • ${(f.parsed.size / 1024).toFixed(0)} KB${
+                    f.parsed.truncated ? " • truncat" : ""
+                  }`}
+                >
+                  <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-primary/15 text-primary">
+                    <FileText className="h-4 w-4" />
+                  </div>
+                  <div className="min-w-0">
+                    <div className="truncate text-xs font-medium text-foreground">
+                      {f.parsed.name}
+                    </div>
+                    <div className="truncate text-[10px] text-muted-foreground">
+                      {f.parsed.kind}
+                      {f.parsed.truncated ? " • truncat" : ""}
+                    </div>
+                  </div>
+                  <button
+                    onClick={() => removeFile(f.id)}
+                    className="absolute right-1 top-1 flex h-5 w-5 items-center justify-center rounded-full bg-background/90 text-foreground opacity-0 shadow transition-opacity hover:bg-destructive hover:text-destructive-foreground group-hover:opacity-100"
+                    aria-label="Elimină fișierul"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                </div>
+              ))}
+              {parsingCount > 0 && (
+                <div className="flex items-center gap-2 rounded-lg border border-dashed border-border bg-surface-2 px-3 py-2 text-xs text-muted-foreground">
+                  <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                  Se citește fișierul…
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-end gap-1.5 p-2 pl-2">
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
@@ -260,7 +300,7 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
                   <Paperclip className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" side="top" className="w-52">
+              <DropdownMenuContent align="start" side="top" className="w-56">
                 <DropdownMenuItem onClick={() => fileInputRef.current?.click()}>
                   <ImageIcon className="mr-2 h-4 w-4" />
                   Încarcă imagini
@@ -268,6 +308,10 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
                 <DropdownMenuItem onClick={() => cameraInputRef.current?.click()}>
                   <Camera className="mr-2 h-4 w-4" />
                   Fă o poză
+                </DropdownMenuItem>
+                <DropdownMenuItem onClick={() => docInputRef.current?.click()}>
+                  <FileText className="mr-2 h-4 w-4" />
+                  Încarcă fișier (PDF, Word…)
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
