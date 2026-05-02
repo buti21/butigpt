@@ -134,6 +134,9 @@ export const MessageBubble = ({ message, streaming }: Props) => {
                   ))}
                 </div>
               )}
+              {message.presentation && !streaming && (
+                <PresentationCard spec={message.presentation} />
+              )}
             </div>
           )}
 
