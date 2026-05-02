@@ -2,9 +2,10 @@ import { useEffect, useRef, useState, DragEvent } from "react";
 import { Sidebar, SidebarToggleFloating, type Conversation } from "@/components/buti/Sidebar";
 import { Welcome } from "@/components/buti/Welcome";
 import { MessageBubble, type ChatMessage } from "@/components/buti/MessageBubble";
-import { ChatInput, type AttachedImage } from "@/components/buti/ChatInput";
+import { ChatInput, type AttachedImage, type AttachedFile } from "@/components/buti/ChatInput";
 import { ButiLogo } from "@/components/buti/ButiLogo";
 import { toast } from "@/hooks/use-toast";
+import { extractPresentationSpec, stripPresentationBlock } from "@/lib/pptx";
 import { ImagePlus } from "lucide-react";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
@@ -128,16 +129,37 @@ const Index = () => {
     }
   };
 
-  const send = async (text: string, attachments: AttachedImage[] = []) => {
+  const send = async (text: string, attachments: AttachedImage[] = [], docFiles: AttachedFile[] = []) => {
     let convId = activeId;
     if (!convId) convId = newConversation();
 
     const imageUrls = attachments.map((a) => a.dataUrl);
 
+    // Build the user-visible text (what we show in the bubble) and the
+    // model-facing text (which includes extracted file contents).
+    const visibleText = text;
+    let modelText = text;
+    if (docFiles.length) {
+      const blocks = docFiles
+        .map(
+          (f) =>
+            `[Conținutul fișierului "${f.parsed.name}" (${f.parsed.kind})${
+              f.parsed.truncated ? ", truncat" : ""
+            }]:\n${f.parsed.text}`,
+        )
+        .join("\n\n");
+      modelText = `${blocks}${text ? `\n\n---\n\n${text}` : ""}`.trim();
+    }
+
+    const fileBadge = docFiles.length
+      ? `📎 ${docFiles.map((f) => f.parsed.name).join(", ")}`
+      : "";
+    const userBubbleText = [fileBadge, visibleText].filter(Boolean).join("\n\n");
+
     const userMsg: ChatMessage = {
       id: uid(),
       role: "user",
-      content: text,
+      content: userBubbleText,
       images: imageUrls.length ? imageUrls : undefined,
     };
     const assistantId = uid();
@@ -147,11 +169,15 @@ const Index = () => {
 
     updateConv(convId, (c) => {
       isFirstExchange = c.messages.length === 0;
+      const titleSeed =
+        text ||
+        (docFiles[0]?.parsed.name) ||
+        (imageUrls.length ? `Imagine (${imageUrls.length})` : "Conversație nouă");
       return {
         ...c,
         title:
           c.messages.length === 0
-            ? (text ? text.slice(0, 40) : `Imagine (${imageUrls.length})`)
+            ? titleSeed.slice(0, 40)
             : c.title,
         updatedAt: Date.now(),
         messages: [
