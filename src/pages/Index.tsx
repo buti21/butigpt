@@ -237,7 +237,7 @@ const Index = () => {
       }));
       const payloadMessages = [
         ...history,
-        { role: "user", content: buildUserApiContent(text, imageUrls) },
+        { role: "user", content: buildUserApiContent(modelText, imageUrls) },
       ];
 
       const resp = await fetch(CHAT_URL, {
@@ -331,9 +331,28 @@ const Index = () => {
         }, 30);
       });
 
+      // Detect a presentation spec block in the final text. If found, attach
+      // it to the assistant message and strip the JSON block from the displayed
+      // content so the user sees a clean message + a download card.
+      const presSpec = extractPresentationSpec(target);
+      if (presSpec) {
+        const cleaned = stripPresentationBlock(target) ||
+          `Am pregătit prezentarea „${presSpec.title}". Apasă mai jos pentru a o descărca.`;
+        target = cleaned;
+        displayed = cleaned;
+        updateConv(convId!, (c) => ({
+          ...c,
+          messages: c.messages.map((m) =>
+            m.id === assistantId
+              ? { ...m, content: cleaned, presentation: presSpec }
+              : m,
+          ),
+        }));
+      }
+
       // Trigger title generation after first exchange completes
       if (isFirstExchange && target.trim()) {
-        generateTitle(convId!, text, target);
+        generateTitle(convId!, text || docFiles.map((f) => f.parsed.name).join(", "), target);
       }
     } catch (e: any) {
       if (e?.name !== "AbortError") {
