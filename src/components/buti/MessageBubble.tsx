@@ -2,10 +2,16 @@ import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ButiLogo } from "./ButiLogo";
-import { User, Copy, Check, Volume2, Loader2, Square } from "lucide-react";
+import { User, Copy, Check, Volume2, Loader2, Square, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTTS } from "@/hooks/use-tts";
 import { toast } from "@/hooks/use-toast";
+import {
+  buildPresentation,
+  downloadBlob,
+  safeFilename,
+  type PresentationSpec,
+} from "@/lib/pptx";
 
 export type ChatRole = "user" | "assistant";
 
@@ -14,6 +20,7 @@ export interface ChatMessage {
   role: ChatRole;
   content: string;
   images?: string[];
+  presentation?: PresentationSpec;
 }
 
 interface Props {
