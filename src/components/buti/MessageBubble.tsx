@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { ButiLogo } from "./ButiLogo";
@@ -99,11 +99,15 @@ export const MessageBubble = ({ message, streaming }: Props) => {
             </div>
           ) : (
             <div className="space-y-3">
-              <div className={`buti-prose ${streaming ? "buti-caret" : ""}`}>
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {message.content || (streaming ? "" : "…")}
-                </ReactMarkdown>
-              </div>
+              {streaming && !message.content ? (
+                <ThinkingIndicator />
+              ) : (
+                <div className={`buti-prose ${streaming ? "buti-caret" : ""}`}>
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {message.content || "…"}
+                  </ReactMarkdown>
+                </div>
+              )}
               {message.images && message.images.length > 0 && (
                 <div className="flex flex-wrap gap-3">
                   {message.images.map((src, i) => (
