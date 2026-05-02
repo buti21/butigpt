@@ -1,5 +1,15 @@
 import { useEffect, useRef, useState, KeyboardEvent, ClipboardEvent } from "react";
-import { ArrowUp, Square, Paperclip, Camera, X, ImageIcon, Mic } from "lucide-react";
+import {
+  ArrowUp,
+  Square,
+  Paperclip,
+  Camera,
+  X,
+  ImageIcon,
+  Mic,
+  FileText,
+  Loader2,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -9,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { toast } from "@/hooks/use-toast";
+import { parseFile, type ParsedFile } from "@/lib/parseFile";
 import { cn } from "@/lib/utils";
 
 export interface AttachedImage {
@@ -18,8 +29,13 @@ export interface AttachedImage {
   size: number;
 }
 
+export interface AttachedFile {
+  id: string;
+  parsed: ParsedFile;
+}
+
 interface Props {
-  onSend: (text: string, images: AttachedImage[]) => void;
+  onSend: (text: string, images: AttachedImage[], files: AttachedFile[]) => void;
   onStop?: () => void;
   isStreaming?: boolean;
   disabled?: boolean;
@@ -28,6 +44,7 @@ interface Props {
 }
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB per image safeguard
+const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20MB per document
 
 const fileToDataUrl = (file: File): Promise<string> =>
   new Promise((resolve, reject) => {
