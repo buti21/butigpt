@@ -200,3 +200,55 @@ const ThinkingIndicator = () => {
     </div>
   );
 };
+
+const PresentationCard = ({ spec }: { spec: PresentationSpec }) => {
+  const [busy, setBusy] = useState(false);
+  const handleDownload = async () => {
+    setBusy(true);
+    try {
+      const blob = await buildPresentation(spec);
+      downloadBlob(blob, `${safeFilename(spec.title)}.pptx`);
+    } catch (e) {
+      console.error(e);
+      toast({
+        title: "Nu am putut crea prezentarea",
+        description: "Încearcă din nou.",
+        variant: "destructive",
+      });
+    } finally {
+      setBusy(false);
+    }
+  };
+  const slideCount = spec.slides?.length ?? 0;
+  return (
+    <div className="flex items-center gap-3 rounded-xl border border-border bg-surface-2 p-3 shadow-soft">
+      <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-lg bg-gradient-primary text-primary-foreground">
+        <Download className="h-5 w-5" />
+      </div>
+      <div className="min-w-0 flex-1">
+        <div className="truncate text-sm font-semibold text-foreground">
+          {spec.title}
+        </div>
+        <div className="text-xs text-muted-foreground">
+          Prezentare PowerPoint • {slideCount} slide{slideCount === 1 ? "" : "-uri"}
+        </div>
+      </div>
+      <Button
+        type="button"
+        size="sm"
+        onClick={handleDownload}
+        disabled={busy}
+        className="flex-shrink-0 rounded-lg bg-gradient-primary text-primary-foreground hover:opacity-90"
+      >
+        {busy ? (
+          <Loader2 className="h-4 w-4 animate-spin" />
+        ) : (
+          <>
+            <Download className="mr-1.5 h-4 w-4" />
+            Descarcă
+          </>
+        )}
+      </Button>
+    </div>
+  );
+};
