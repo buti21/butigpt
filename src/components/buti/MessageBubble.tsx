@@ -174,3 +174,19 @@ export const MessageBubble = ({ message, streaming }: Props) => {
     </div>
   );
 };
+
+const ThinkingIndicator = () => {
+  const [dots, setDots] = useState(1);
+  useEffect(() => {
+    const id = window.setInterval(() => {
+      setDots((d) => (d >= 3 ? 1 : d + 1));
+    }, 400);
+    return () => window.clearInterval(id);
+  }, []);
+  return (
+    <div className="flex items-center text-muted-foreground italic select-none">
+      <span>Se gândește</span>
+      <span className="ml-0.5 inline-block w-6 text-left">{".".repeat(dots)}</span>
+    </div>
+  );
+};
