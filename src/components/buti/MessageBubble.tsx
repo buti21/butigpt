@@ -119,19 +119,18 @@ export const MessageBubble = ({ message, streaming }: Props) => {
               {message.images && message.images.length > 0 && (
                 <div className="flex flex-wrap gap-3">
                   {message.images.map((src, i) => (
-                    <a
+                    <button
+                      type="button"
                       key={i}
-                      href={src}
-                      target="_blank"
-                      rel="noreferrer"
-                      className="block overflow-hidden rounded-xl border border-border bg-surface-2 shadow-soft transition-transform hover:scale-[1.01]"
+                      onClick={() => setLightboxSrc(src)}
+                      className="block overflow-hidden rounded-xl border border-border bg-surface-2 shadow-soft transition-transform hover:scale-[1.01] cursor-zoom-in"
                     >
                       <img
                         src={src}
                         alt={`Imagine generată ${i + 1}`}
-                        className="max-h-96 max-w-md object-contain"
+                        className="max-h-96 max-w-[80vw] sm:max-w-md object-contain"
                       />
-                    </a>
+                    </button>
                   ))}
                 </div>
               )}
