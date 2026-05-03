@@ -181,6 +181,7 @@ export const MessageBubble = ({ message, streaming }: Props) => {
           )}
         </div>
       </div>
+      <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
     </div>
   );
 };
