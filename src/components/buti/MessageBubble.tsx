@@ -6,6 +6,7 @@ import { User, Copy, Check, Volume2, Loader2, Square, Download } from "lucide-re
 import { Button } from "@/components/ui/button";
 import { useTTS } from "@/hooks/use-tts";
 import { toast } from "@/hooks/use-toast";
+import { ImageLightbox } from "./ImageLightbox";
 import {
   buildPresentation,
   downloadBlob,
