@@ -369,15 +369,26 @@ const Index = () => {
       // Mark stream done — typewriter will stop after draining
       streamFinished = true;
 
-      // Wait for typewriter to fully drain before clearing streaming state
+      // Wait for typewriter to fully drain (or user pressed stop)
       await new Promise<void>((resolve) => {
         const check = window.setInterval(() => {
-          if (displayed.length >= target.length) {
+          if (stopFlagRef.current || displayed.length >= target.length) {
             window.clearInterval(check);
             resolve();
           }
         }, 30);
       });
+
+      if (stopFlagRef.current) {
+        // Snap to whatever was already streamed
+        const snap = target;
+        updateConv(convId!, (c) => ({
+          ...c,
+          messages: c.messages.map((m) =>
+            m.id === assistantId ? { ...m, content: snap } : m,
+          ),
+        }));
+      }
 
       // Detect a presentation spec block in the final text. If found, attach
       // it to the assistant message and strip the JSON block from the displayed
