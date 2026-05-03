@@ -41,17 +41,36 @@ const buildUserApiContent = (text: string, images: string[]) => {
   return parts;
 };
 
+const STORAGE_KEY = "butigpt:conversations:v1";
+const ACTIVE_KEY = "butigpt:active:v1";
+
 const Index = () => {
-  const [conversations, setConversations] = useState<ConversationState[]>([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
+  const [conversations, setConversations] = useState<ConversationState[]>(() => {
+    if (typeof window === "undefined") return [];
+    try {
+      const raw = localStorage.getItem(STORAGE_KEY);
+      if (!raw) return [];
+      const parsed = JSON.parse(raw);
+      if (!Array.isArray(parsed)) return [];
+      return parsed as ConversationState[];
+    } catch {
+      return [];
+    }
+  });
+  const [activeId, setActiveId] = useState<string | null>(() => {
+    if (typeof window === "undefined") return null;
+    return localStorage.getItem(ACTIVE_KEY);
+  });
   const [isStreaming, setIsStreaming] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
 
   const abortRef = useRef<AbortController | null>(null);
+  const stopFlagRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
   const stickToBottomRef = useRef(true);
+  const isAutoScrollingRef = useRef(false);
 
   // Used by ChatInput-less drop: queue files until the input picks them up.
   const [pendingDropImages, setPendingDropImages] = useState<AttachedImage[]>([]);
@@ -62,10 +81,32 @@ const Index = () => {
     }
   }, []);
 
+  // Persist conversations & active id
+  useEffect(() => {
+    try {
+      localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
+    } catch {
+      /* quota or serialization */
+    }
+  }, [conversations]);
+  useEffect(() => {
+    try {
+      if (activeId) localStorage.setItem(ACTIVE_KEY, activeId);
+      else localStorage.removeItem(ACTIVE_KEY);
+    } catch {
+      /* ignore */
+    }
+  }, [activeId]);
+
   const active = conversations.find((c) => c.id === activeId) ?? null;
 
-  // Track whether user is near bottom — if not, don't auto-scroll
+  // Track whether user is near bottom — if not, don't auto-scroll.
+  // Ignore scroll events triggered by our own programmatic scrolling.
   const handleScroll = () => {
+    if (isAutoScrollingRef.current) {
+      isAutoScrollingRef.current = false;
+      return;
+    }
     const el = scrollRef.current;
     if (!el) return;
     const distance = el.scrollHeight - el.scrollTop - el.clientHeight;
@@ -77,6 +118,7 @@ const Index = () => {
     const el = scrollRef.current;
     if (!el) return;
     if (!stickToBottomRef.current) return;
+    isAutoScrollingRef.current = true;
     el.scrollTop = el.scrollHeight;
   }, [active?.messages.length, active?.messages[active.messages.length - 1]?.content]);
 
@@ -103,6 +145,7 @@ const Index = () => {
   };
 
   const stop = () => {
+    stopFlagRef.current = true;
     abortRef.current?.abort();
     abortRef.current = null;
     setIsStreaming(false);
