@@ -234,6 +234,7 @@ const Index = () => {
     // When user sends a new message, force scroll to bottom
     stickToBottomRef.current = true;
 
+    stopFlagRef.current = false;
     setIsStreaming(true);
     const controller = new AbortController();
     abortRef.current = controller;
