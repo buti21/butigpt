@@ -318,6 +318,10 @@ const Index = () => {
       let done = false;
 
       while (!done) {
+        if (stopFlagRef.current) {
+          try { await reader.cancel(); } catch { /* ignore */ }
+          break;
+        }
         const { done: rDone, value } = await reader.read();
         if (rDone) break;
         buffer += decoder.decode(value, { stream: true });
