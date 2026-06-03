@@ -110,7 +110,7 @@ export const MessageBubble = ({ message, streaming }: Props) => {
               {streaming && !message.content ? (
                 <ThinkingIndicator />
               ) : (
-                <div className={`buti-prose ${streaming ? "buti-caret" : ""}`}>
+                <div className="buti-prose">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>
                     {message.content || "…"}
                   </ReactMarkdown>

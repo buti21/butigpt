@@ -531,24 +531,26 @@ const Index = () => {
         </header>
 
         <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto scrollbar-thin">
-          {messages.length === 0 ? (
+          {!activeId && messages.length === 0 ? (
             <Welcome onPick={(p) => send(p)} />
           ) : (
             <div className="pb-6">
               {messages.map((m, i) => (
-                <MessageBubble
-                  key={m.id}
-                  message={m}
-                  streaming={
-                    isStreaming &&
-                    i === messages.length - 1 &&
-                    m.role === "assistant"
-                  }
-                />
+                <div key={m.id} className="animate-fade-in">
+                  <MessageBubble
+                    message={m}
+                    streaming={
+                      isStreaming &&
+                      i === messages.length - 1 &&
+                      m.role === "assistant"
+                    }
+                  />
+                </div>
               ))}
             </div>
           )}
         </div>
+
 
         <ChatInput
           onSend={send}
