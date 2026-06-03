@@ -13,8 +13,8 @@ const TITLE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/title`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
 // Typewriter pacing — characters streamed per tick
-const TYPEWRITER_CHARS_PER_TICK = 2;
-const TYPEWRITER_INTERVAL_MS = 18;
+const TYPEWRITER_CHARS_PER_TICK = 1;
+const TYPEWRITER_INTERVAL_MS = 12;
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
@@ -536,18 +536,18 @@ const Index = () => {
           ) : (
             <div className="pb-6">
               {messages.map((m, i) => (
-                <div key={m.id} className="animate-fade-in">
-                  <MessageBubble
-                    message={m}
-                    streaming={
-                      isStreaming &&
-                      i === messages.length - 1 &&
-                      m.role === "assistant"
-                    }
-                  />
-                </div>
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  streaming={
+                    isStreaming &&
+                    i === messages.length - 1 &&
+                    m.role === "assistant"
+                  }
+                />
               ))}
             </div>
+
           )}
         </div>
 
