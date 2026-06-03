@@ -13,8 +13,8 @@ const TITLE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/title`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
 // Typewriter pacing — characters streamed per tick
-const TYPEWRITER_CHARS_PER_TICK = 2;
-const TYPEWRITER_INTERVAL_MS = 18;
+const TYPEWRITER_CHARS_PER_TICK = 1;
+const TYPEWRITER_INTERVAL_MS = 12;
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
