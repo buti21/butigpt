@@ -536,18 +536,18 @@ const Index = () => {
           ) : (
             <div className="pb-6">
               {messages.map((m, i) => (
-                <div key={m.id} className="animate-fade-in">
-                  <MessageBubble
-                    message={m}
-                    streaming={
-                      isStreaming &&
-                      i === messages.length - 1 &&
-                      m.role === "assistant"
-                    }
-                  />
-                </div>
+                <MessageBubble
+                  key={m.id}
+                  message={m}
+                  streaming={
+                    isStreaming &&
+                    i === messages.length - 1 &&
+                    m.role === "assistant"
+                  }
+                />
               ))}
             </div>
+
           )}
         </div>
 
