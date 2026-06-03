@@ -2,32 +2,35 @@ import { createRoot } from "react-dom/client";
 import App from "./App.tsx";
 import "./index.css";
 
-// Guard: never register the service worker inside Lovable's preview iframe
-// or on preview hosts — only on the published/production domain.
-const isInIframe = (() => {
+// --- Cleanup: old PWA service worker had scope "/butigpt/" which is now
+// serving stale/broken assets in production. Always unregister any SW and
+// clear caches so the app loads fresh, then redirect off the old path.
+const cleanup = async () => {
   try {
-    return window.self !== window.top;
+    if ("serviceWorker" in navigator) {
+      const regs = await navigator.serviceWorker.getRegistrations();
+      await Promise.all(regs.map((r) => r.unregister()));
+    }
+    if ("caches" in window) {
+      const keys = await caches.keys();
+      await Promise.all(keys.map((k) => caches.delete(k)));
+    }
   } catch {
-    return true;
+    /* ignore */
   }
-})();
-const host = window.location.hostname;
-const isPreviewHost =
-  host.includes("id-preview--") ||
-  host.includes("lovableproject.com") ||
-  host.includes("lovable.dev");
+};
 
-if (isPreviewHost || isInIframe) {
-  // Clean up any SW that may have been registered previously in preview
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.getRegistrations().then((regs) => {
-      regs.forEach((r) => r.unregister());
-    });
-  }
-} else if ("serviceWorker" in navigator) {
-  import("virtual:pwa-register").then(({ registerSW }) => {
-    registerSW({ immediate: true });
-  });
+// Fire-and-forget cleanup
+cleanup();
+
+// If a user lands on the legacy /butigpt/* path (old SW scope), bounce them
+// to the real root so SPA routing works.
+if (window.location.pathname.startsWith("/butigpt")) {
+  const newPath =
+    window.location.pathname.replace(/^\/butigpt\/?/, "/") +
+    window.location.search +
+    window.location.hash;
+  window.history.replaceState(null, "", newPath);
 }
 
 createRoot(document.getElementById("root")!).render(<App />);
