@@ -61,6 +61,12 @@ export const MessageBubble = ({ message, streaming }: Props) => {
   // Hide actions while streaming for assistant (incomplete content)
   const showActions = !!message.content && !streaming;
 
+  // While the assistant is still "thinking" (no content yet), render nothing —
+  // avatar + dots should only appear once text starts streaming, like ChatGPT.
+  if (!isUser && streaming && !message.content) {
+    return null;
+  }
+
   return (
     <div className="w-full">
       <div className="mx-auto flex max-w-3xl gap-4 px-4 py-5">
