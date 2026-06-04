@@ -450,7 +450,7 @@ const Index = () => {
       }
     } finally {
       if (typewriterTimer !== null) {
-        window.clearInterval(typewriterTimer);
+        window.clearTimeout(typewriterTimer);
       }
       setIsStreaming(false);
       abortRef.current = null;
