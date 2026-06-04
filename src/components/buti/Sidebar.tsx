@@ -110,7 +110,7 @@ export const Sidebar = ({
                         e.stopPropagation();
                         setPendingDelete(c);
                       }}
-                      className="flex-shrink-0 rounded p-1 text-muted-foreground transition-all duration-200 hover:text-destructive hover:bg-destructive/10 md:opacity-0 md:group-hover:opacity-100"
+                      className="flex-shrink-0 rounded p-1.5 text-muted-foreground opacity-100 transition-all duration-200 hover:text-destructive hover:bg-destructive/10 md:opacity-0 md:group-hover:opacity-100"
                       aria-label="Șterge conversația"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
