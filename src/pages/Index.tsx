@@ -12,9 +12,13 @@ const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const TITLE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/title`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
-// Typewriter pacing — characters streamed per tick
-const TYPEWRITER_CHARS_PER_TICK = 1;
-const TYPEWRITER_INTERVAL_MS = 12;
+// Typewriter pacing — natural variable-speed typing
+const TYPEWRITER_BASE_MS = 8;          // base delay between ticks
+const TYPEWRITER_PUNCT_PAUSE_MS = 90;  // extra pause after . ! ? : ;
+const TYPEWRITER_COMMA_PAUSE_MS = 40;  // extra pause after , — –
+const TYPEWRITER_NEWLINE_PAUSE_MS = 60;
+const TYPEWRITER_CATCHUP_THRESHOLD = 120; // if buffer grows, accelerate
+const TYPEWRITER_MAX_CHARS_PER_TICK = 6;  // max chars when catching up
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
