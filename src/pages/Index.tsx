@@ -249,20 +249,24 @@ const Index = () => {
     let typewriterTimer: number | null = null;
     let streamFinished = false;
 
-    const flushTypewriter = () => {
+    const scheduleTypewriter = () => {
       if (typewriterTimer !== null) return;
-      typewriterTimer = window.setInterval(() => {
+      const tick = () => {
+        typewriterTimer = null;
         if (displayed.length >= target.length) {
-          if (streamFinished) {
-            window.clearInterval(typewriterTimer!);
-            typewriterTimer = null;
+          if (!streamFinished) {
+            typewriterTimer = window.setTimeout(tick, TYPEWRITER_BASE_MS);
           }
           return;
         }
-        const next = Math.min(
-          displayed.length + TYPEWRITER_CHARS_PER_TICK,
-          target.length,
+        // Catch up if backend is far ahead — keep things from feeling laggy
+        const remaining = target.length - displayed.length;
+        const chunkSize = Math.min(
+          TYPEWRITER_MAX_CHARS_PER_TICK,
+          Math.max(1, Math.floor(remaining / TYPEWRITER_CATCHUP_THRESHOLD) + 1),
         );
+        const next = Math.min(displayed.length + chunkSize, target.length);
+        const justTyped = target.slice(displayed.length, next);
         displayed = target.slice(0, next);
         const snapshot = displayed;
         updateConv(convId!, (c) => ({
@@ -271,8 +275,19 @@ const Index = () => {
             m.id === assistantId ? { ...m, content: snapshot } : m,
           ),
         }));
-      }, TYPEWRITER_INTERVAL_MS);
+
+        // Natural pacing based on what was just typed
+        const lastChar = justTyped.slice(-1);
+        let delay = TYPEWRITER_BASE_MS;
+        if (".!?:;".includes(lastChar)) delay += TYPEWRITER_PUNCT_PAUSE_MS;
+        else if (",–—".includes(lastChar)) delay += TYPEWRITER_COMMA_PAUSE_MS;
+        else if (lastChar === "\n") delay += TYPEWRITER_NEWLINE_PAUSE_MS;
+
+        typewriterTimer = window.setTimeout(tick, delay);
+      };
+      typewriterTimer = window.setTimeout(tick, TYPEWRITER_BASE_MS);
     };
+    const flushTypewriter = scheduleTypewriter;
 
     try {
       const conv = conversations.find((c) => c.id === convId);
