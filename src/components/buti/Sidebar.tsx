@@ -131,26 +131,34 @@ export const Sidebar = ({
         open={!!pendingDelete}
         onOpenChange={(o) => !o && setPendingDelete(null)}
       >
-        <AlertDialogContent className="border-border bg-surface-1">
+        <AlertDialogContent className="border-border bg-surface-1 shadow-glow sm:max-w-md">
           <AlertDialogHeader>
-            <AlertDialogTitle>Șterge discuția?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Această acțiune va șterge{" "}
+            <div className="mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10 ring-1 ring-destructive/30 sm:mx-0">
+              <AlertTriangle className="h-6 w-6 text-destructive" />
+            </div>
+            <AlertDialogTitle className="text-center sm:text-left">
+              Șterge discuția?
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-center sm:text-left">
+              Această acțiune va șterge definitiv{" "}
               <span className="font-semibold text-foreground">
-                {pendingDelete?.title}
+                „{pendingDelete?.title}"
               </span>
-              .
+              . Nu poate fi anulată.
             </AlertDialogDescription>
           </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="rounded-lg">Anulează</AlertDialogCancel>
+          <AlertDialogFooter className="gap-2 sm:gap-2">
+            <AlertDialogCancel className="rounded-lg transition-transform hover:scale-[1.02]">
+              Anulează
+            </AlertDialogCancel>
             <AlertDialogAction
               onClick={() => {
                 if (pendingDelete) onDelete(pendingDelete.id);
                 setPendingDelete(null);
               }}
-              className="rounded-lg bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              className="rounded-lg bg-destructive text-destructive-foreground shadow-soft transition-transform hover:scale-[1.02] hover:bg-destructive/90"
             >
+              <Trash2 className="mr-1.5 h-4 w-4" />
               Șterge
             </AlertDialogAction>
           </AlertDialogFooter>
