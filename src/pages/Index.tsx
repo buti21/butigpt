@@ -627,28 +627,34 @@ const Index = () => {
               </div>
             </div>
           </div>
+          <UserMenu />
         </header>
 
         <div ref={scrollRef} onScroll={handleScroll} className="flex-1 overflow-y-auto scrollbar-thin">
-          {!activeId && messages.length === 0 ? (
-            <Welcome onPick={(p) => send(p)} />
-          ) : (
-            <div className="pb-6">
-              {messages.map((m, i) => (
-                <MessageBubble
-                  key={m.id}
-                  message={m}
-                  streaming={
-                    isStreaming &&
-                    i === messages.length - 1 &&
-                    m.role === "assistant"
-                  }
-                />
-              ))}
-            </div>
-
-          )}
+          <div
+            key={activeId ?? "welcome"}
+            className="h-full animate-screen-in"
+          >
+            {!activeId || messages.length === 0 ? (
+              <Welcome onPick={(p) => send(p)} />
+            ) : (
+              <div className="pb-6">
+                {messages.map((m, i) => (
+                  <MessageBubble
+                    key={m.id}
+                    message={m}
+                    streaming={
+                      isStreaming &&
+                      i === messages.length - 1 &&
+                      m.role === "assistant"
+                    }
+                  />
+                ))}
+              </div>
+            )}
+          </div>
         </div>
+
 
 
         <ChatInput
