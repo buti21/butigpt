@@ -51,10 +51,17 @@ export const Welcome = ({ onPick }: Props) => {
   return (
     <div className="flex h-full w-full items-center justify-center px-4 animate-fade-in">
       <div className="mx-auto w-full max-w-2xl text-center">
-        <ButiLogo className="mx-auto h-16 w-16" />
-        <h1 className="mt-6 text-3xl font-semibold tracking-tight text-foreground">
+        <div className="relative mx-auto h-24 w-24">
+          <div
+            className="absolute left-1/2 top-1/2 -z-10 h-40 w-40 bg-gradient-primary opacity-40 blur-2xl animate-blob-morph"
+            aria-hidden="true"
+          />
+          <ButiLogo className="mx-auto h-16 w-16 mt-4 animate-logo-morph" />
+        </div>
+        <h1 className="mt-4 text-3xl font-semibold tracking-tight text-foreground">
           Bine ai venit la ButiGPT
         </h1>
+
         <p className="mx-auto mt-3 max-w-md text-[15px] leading-relaxed text-muted-foreground">
           Sunt asistentul tău AI personal. Întreabă-mă orice — te ajut cu idei,
           explicații, cod sau organizare.
