@@ -77,6 +77,9 @@ const Index = () => {
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
 
+  const { user } = useAuth();
+  const userIdRef = useRef<string | null>(null);
+
   const abortRef = useRef<AbortController | null>(null);
   const stopFlagRef = useRef(false);
   const scrollRef = useRef<HTMLDivElement>(null);
@@ -92,7 +95,47 @@ const Index = () => {
     }
   }, []);
 
-  // Persist conversations & active id
+  // === Cloud sync: swap state when auth user changes ===
+  useEffect(() => {
+    const currentId = user?.id ?? null;
+    if (currentId === userIdRef.current) return;
+    userIdRef.current = currentId;
+
+    if (currentId) {
+      // logged in: load from DB
+      (async () => {
+        const { data, error } = await supabase
+          .from("conversations")
+          .select("id, title, updated_at, messages")
+          .order("updated_at", { ascending: false });
+        if (error) {
+          console.error("load conversations", error);
+          return;
+        }
+        const loaded: ConversationState[] = (data ?? []).map((row) => ({
+          id: row.id,
+          title: row.title,
+          updatedAt: new Date(row.updated_at).getTime(),
+          messages: (Array.isArray(row.messages) ? row.messages : []) as ChatMessage[],
+        }));
+        setConversations(loaded);
+        setActiveId(loaded[0]?.id ?? null);
+      })();
+    } else {
+      // logged out: restore from localStorage
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        const parsed = raw ? JSON.parse(raw) : [];
+        setConversations(Array.isArray(parsed) ? parsed : []);
+        setActiveId(localStorage.getItem(ACTIVE_KEY));
+      } catch {
+        setConversations([]);
+        setActiveId(null);
+      }
+    }
+  }, [user]);
+
+  // Persist conversations & active id (localStorage = offline cache)
   useEffect(() => {
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
@@ -108,6 +151,29 @@ const Index = () => {
       /* ignore */
     }
   }, [activeId]);
+
+  // Debounced cloud sync when logged in (skip while streaming)
+  useEffect(() => {
+    if (!user || isStreaming) return;
+    const t = window.setTimeout(() => {
+      const rows = conversations.map((c) => ({
+        id: c.id,
+        user_id: user.id,
+        title: c.title,
+        messages: c.messages as unknown as object[],
+        updated_at: new Date(c.updatedAt).toISOString(),
+      }));
+      if (!rows.length) return;
+      supabase
+        .from("conversations")
+        .upsert(rows, { onConflict: "id" })
+        .then(({ error }) => {
+          if (error) console.error("sync error", error);
+        });
+    }, 1200);
+    return () => window.clearTimeout(t);
+  }, [conversations, user, isStreaming]);
+
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
 
