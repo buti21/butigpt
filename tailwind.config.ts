@@ -76,26 +76,41 @@ export default {
       },
       keyframes: {
         "accordion-down": {
-          from: {
-            height: "0",
-          },
-          to: {
-            height: "var(--radix-accordion-content-height)",
-          },
+          from: { height: "0" },
+          to: { height: "var(--radix-accordion-content-height)" },
         },
         "accordion-up": {
-          from: {
-            height: "var(--radix-accordion-content-height)",
-          },
-          to: {
-            height: "0",
-          },
+          from: { height: "var(--radix-accordion-content-height)" },
+          to: { height: "0" },
+        },
+        "fade-in": {
+          "0%": { opacity: "0", transform: "translateY(8px)" },
+          "100%": { opacity: "1", transform: "translateY(0)" },
+        },
+        "screen-in": {
+          "0%": { opacity: "0", transform: "translateY(12px) scale(0.985)", filter: "blur(6px)" },
+          "60%": { filter: "blur(0)" },
+          "100%": { opacity: "1", transform: "translateY(0) scale(1)", filter: "blur(0)" },
+        },
+        "logo-morph": {
+          "0%, 100%": { transform: "scale(1) rotate(0deg)", filter: "drop-shadow(0 0 18px hsl(var(--primary) / 0.45))" },
+          "50%": { transform: "scale(1.06) rotate(2deg)", filter: "drop-shadow(0 0 32px hsl(var(--primary) / 0.7))" },
+        },
+        "blob-morph": {
+          "0%, 100%": { borderRadius: "42% 58% 63% 37% / 41% 44% 56% 59%", transform: "translate(-50%, -50%) rotate(0deg) scale(1)" },
+          "33%": { borderRadius: "60% 40% 30% 70% / 60% 30% 70% 40%", transform: "translate(-50%, -50%) rotate(40deg) scale(1.05)" },
+          "66%": { borderRadius: "30% 70% 70% 30% / 30% 30% 70% 70%", transform: "translate(-50%, -50%) rotate(-30deg) scale(0.95)" },
         },
       },
       animation: {
         "accordion-down": "accordion-down 0.2s ease-out",
         "accordion-up": "accordion-up 0.2s ease-out",
+        "fade-in": "fade-in 0.4s ease-out",
+        "screen-in": "screen-in 0.55s cubic-bezier(0.22, 1, 0.36, 1)",
+        "logo-morph": "logo-morph 4s ease-in-out infinite",
+        "blob-morph": "blob-morph 12s ease-in-out infinite",
       },
+
     },
   },
   plugins: [require("tailwindcss-animate")],
