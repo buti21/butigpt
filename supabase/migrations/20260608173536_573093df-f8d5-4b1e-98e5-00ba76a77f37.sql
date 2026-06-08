@@ -1,0 +1,1 @@
+ALTER TABLE public.conversations ADD COLUMN messages JSONB NOT NULL DEFAULT '[]'::jsonb;
