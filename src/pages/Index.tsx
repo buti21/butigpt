@@ -216,7 +216,13 @@ const Index = () => {
   const deleteConversation = (id: string) => {
     setConversations((prev) => prev.filter((c) => c.id !== id));
     if (activeId === id) setActiveId(null);
+    if (user) {
+      supabase.from("conversations").delete().eq("id", id).then(({ error }) => {
+        if (error) console.error("delete error", error);
+      });
+    }
   };
+
 
   const updateConv = (id: string, updater: (c: ConversationState) => ConversationState) => {
     setConversations((prev) => prev.map((c) => (c.id === id ? updater(c) : c)));
