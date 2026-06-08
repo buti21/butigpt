@@ -116,7 +116,7 @@ const Index = () => {
           id: row.id,
           title: row.title,
           updatedAt: new Date(row.updated_at).getTime(),
-          messages: (Array.isArray(row.messages) ? row.messages : []) as ChatMessage[],
+          messages: (Array.isArray(row.messages) ? row.messages : []) as unknown as ChatMessage[],
         }));
         setConversations(loaded);
         setActiveId(loaded[0]?.id ?? null);
@@ -160,9 +160,10 @@ const Index = () => {
         id: c.id,
         user_id: user.id,
         title: c.title,
-        messages: c.messages as unknown as object[],
+        messages: c.messages as unknown as import("@/integrations/supabase/types").Json,
         updated_at: new Date(c.updatedAt).toISOString(),
       }));
+
       if (!rows.length) return;
       supabase
         .from("conversations")
