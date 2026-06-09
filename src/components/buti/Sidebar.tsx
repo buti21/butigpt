@@ -28,6 +28,7 @@ interface Props {
   onDelete: (id: string) => void;
   open: boolean;
   onToggle: () => void;
+  onOpenSettings: () => void;
 }
 
 export const Sidebar = ({
