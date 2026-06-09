@@ -69,6 +69,46 @@
     /* Motion */
     --transition-base: 200ms cubic-bezier(0.4, 0, 0.2, 1);
   }
+
+  .light {
+    --background: 0 0% 100%;
+    --foreground: 222 18% 10%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 18% 10%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 18% 10%;
+    --primary: 258 90% 60%;
+    --primary-foreground: 0 0% 100%;
+    --primary-glow: 268 95% 70%;
+    --secondary: 220 14% 96%;
+    --secondary-foreground: 222 18% 10%;
+    --muted: 220 14% 96%;
+    --muted-foreground: 222 10% 40%;
+    --accent: 220 14% 94%;
+    --accent-foreground: 222 18% 10%;
+    --destructive: 0 72% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 220 14% 90%;
+    --input: 220 14% 92%;
+    --ring: 258 90% 60%;
+    --sidebar: 220 14% 98%;
+    --sidebar-foreground: 222 18% 14%;
+    --sidebar-border: 220 14% 90%;
+    --sidebar-hover: 220 14% 94%;
+    --surface-1: 220 14% 98%;
+    --surface-2: 220 14% 96%;
+    --surface-3: 220 14% 92%;
+    --sidebar-background: 220 14% 98%;
+    --sidebar-primary: 258 90% 60%;
+    --sidebar-primary-foreground: 0 0% 100%;
+    --sidebar-accent: 220 14% 94%;
+    --sidebar-accent-foreground: 222 18% 10%;
+    --sidebar-ring: 258 90% 60%;
+    --gradient-bg: radial-gradient(1200px 600px at 80% -10%, hsl(258 90% 66% / 0.10), transparent 60%),
+                   radial-gradient(900px 500px at -10% 110%, hsl(280 90% 70% / 0.08), transparent 60%);
+    --shadow-glow: 0 10px 40px -12px hsl(258 90% 66% / 0.30);
+    --shadow-soft: 0 1px 0 hsl(0 0% 100% / 0.6) inset, 0 8px 24px -12px hsl(0 0% 0% / 0.15);
+  }
 }
 
 @layer base {
