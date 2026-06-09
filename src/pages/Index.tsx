@@ -76,8 +76,15 @@ const Index = () => {
   });
   const [isStreaming, setIsStreaming] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
+
+  const { typewriterSpeed } = useSettings();
+  const speedMul =
+    typewriterSpeed === "slow" ? 2.2 :
+    typewriterSpeed === "fast" ? 0.4 :
+    typewriterSpeed === "instant" ? 0 : 1;
 
   const { user } = useAuth();
   const userIdRef = useRef<string | null>(null);
