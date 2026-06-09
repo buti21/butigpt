@@ -5,7 +5,9 @@ import { MessageBubble, type ChatMessage } from "@/components/buti/MessageBubble
 import { ChatInput, type AttachedImage, type AttachedFile } from "@/components/buti/ChatInput";
 import { ButiLogo } from "@/components/buti/ButiLogo";
 import { UserMenu } from "@/components/buti/UserMenu";
+import { SettingsDialog } from "@/components/buti/SettingsDialog";
 import { useAuth } from "@/hooks/use-auth";
+import { useSettings } from "@/hooks/use-settings";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { extractPresentationSpec, stripPresentationBlock } from "@/lib/pptx";
