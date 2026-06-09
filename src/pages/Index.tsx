@@ -645,6 +645,15 @@ const Index = () => {
         onDelete={deleteConversation}
         open={sidebarOpen}
         onToggle={() => setSidebarOpen((s) => !s)}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        conversationsCount={conversations.length}
+        onExport={exportConversations}
+        onClearAll={clearAllConversations}
       />
 
       <main className="flex min-w-0 flex-1 flex-col">
