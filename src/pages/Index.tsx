@@ -232,6 +232,29 @@ const Index = () => {
     }
   };
 
+  const clearAllConversations = async () => {
+    const ids = conversations.map((c) => c.id);
+    setConversations([]);
+    setActiveId(null);
+    if (user && ids.length) {
+      const { error } = await supabase.from("conversations").delete().in("id", ids);
+      if (error) console.error("clear all error", error);
+    }
+    toast({ title: "Conversații șterse", description: "Toate conversațiile au fost eliminate." });
+  };
+
+  const exportConversations = () => {
+    const blob = new Blob([JSON.stringify(conversations, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `butigpt-conversations-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
 
   const updateConv = (id: string, updater: (c: ConversationState) => ConversationState) => {
     setConversations((prev) => prev.map((c) => (c.id === id ? updater(c) : c)));
