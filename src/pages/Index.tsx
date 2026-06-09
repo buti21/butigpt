@@ -5,7 +5,9 @@ import { MessageBubble, type ChatMessage } from "@/components/buti/MessageBubble
 import { ChatInput, type AttachedImage, type AttachedFile } from "@/components/buti/ChatInput";
 import { ButiLogo } from "@/components/buti/ButiLogo";
 import { UserMenu } from "@/components/buti/UserMenu";
+import { SettingsDialog } from "@/components/buti/SettingsDialog";
 import { useAuth } from "@/hooks/use-auth";
+import { useSettings } from "@/hooks/use-settings";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "@/hooks/use-toast";
 import { extractPresentationSpec, stripPresentationBlock } from "@/lib/pptx";
@@ -74,8 +76,15 @@ const Index = () => {
   });
   const [isStreaming, setIsStreaming] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
+
+  const { typewriterSpeed } = useSettings();
+  const speedMul =
+    typewriterSpeed === "slow" ? 2.2 :
+    typewriterSpeed === "fast" ? 0.4 :
+    typewriterSpeed === "instant" ? 0 : 1;
 
   const { user } = useAuth();
   const userIdRef = useRef<string | null>(null);
@@ -223,6 +232,29 @@ const Index = () => {
     }
   };
 
+  const clearAllConversations = async () => {
+    const ids = conversations.map((c) => c.id);
+    setConversations([]);
+    setActiveId(null);
+    if (user && ids.length) {
+      const { error } = await supabase.from("conversations").delete().in("id", ids);
+      if (error) console.error("clear all error", error);
+    }
+    toast({ title: "Conversații șterse", description: "Toate conversațiile au fost eliminate." });
+  };
+
+  const exportConversations = () => {
+    const blob = new Blob([JSON.stringify(conversations, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `butigpt-conversations-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  };
+
 
   const updateConv = (id: string, updater: (c: ConversationState) => ConversationState) => {
     setConversations((prev) => prev.map((c) => (c.id === id ? updater(c) : c)));
@@ -328,6 +360,11 @@ const Index = () => {
     let displayed = "";
     let typewriterTimer: number | null = null;
     let streamFinished = false;
+    const baseMs = Math.max(0, TYPEWRITER_BASE_MS * speedMul);
+    const punctMs = TYPEWRITER_PUNCT_PAUSE_MS * speedMul;
+    const commaMs = TYPEWRITER_COMMA_PAUSE_MS * speedMul;
+    const nlMs = TYPEWRITER_NEWLINE_PAUSE_MS * speedMul;
+    const instant = speedMul === 0;
 
     const scheduleTypewriter = () => {
       if (typewriterTimer !== null) return;
@@ -335,16 +372,17 @@ const Index = () => {
         typewriterTimer = null;
         if (displayed.length >= target.length) {
           if (!streamFinished) {
-            typewriterTimer = window.setTimeout(tick, TYPEWRITER_BASE_MS);
+            typewriterTimer = window.setTimeout(tick, baseMs || 16);
           }
           return;
         }
-        // Catch up if backend is far ahead — keep things from feeling laggy
         const remaining = target.length - displayed.length;
-        const chunkSize = Math.min(
-          TYPEWRITER_MAX_CHARS_PER_TICK,
-          Math.max(1, Math.floor(remaining / TYPEWRITER_CATCHUP_THRESHOLD) + 1),
-        );
+        const chunkSize = instant
+          ? remaining
+          : Math.min(
+              TYPEWRITER_MAX_CHARS_PER_TICK,
+              Math.max(1, Math.floor(remaining / TYPEWRITER_CATCHUP_THRESHOLD) + 1),
+            );
         const next = Math.min(displayed.length + chunkSize, target.length);
         const justTyped = target.slice(displayed.length, next);
         displayed = target.slice(0, next);
@@ -356,18 +394,18 @@ const Index = () => {
           ),
         }));
 
-        // Natural pacing based on what was just typed
         const lastChar = justTyped.slice(-1);
-        let delay = TYPEWRITER_BASE_MS;
-        if (".!?:;".includes(lastChar)) delay += TYPEWRITER_PUNCT_PAUSE_MS;
-        else if (",–—".includes(lastChar)) delay += TYPEWRITER_COMMA_PAUSE_MS;
-        else if (lastChar === "\n") delay += TYPEWRITER_NEWLINE_PAUSE_MS;
+        let delay = baseMs;
+        if (".!?:;".includes(lastChar)) delay += punctMs;
+        else if (",–—".includes(lastChar)) delay += commaMs;
+        else if (lastChar === "\n") delay += nlMs;
 
         typewriterTimer = window.setTimeout(tick, delay);
       };
-      typewriterTimer = window.setTimeout(tick, TYPEWRITER_BASE_MS);
+      typewriterTimer = window.setTimeout(tick, baseMs);
     };
     const flushTypewriter = scheduleTypewriter;
+
 
     try {
       const conv = conversations.find((c) => c.id === convId);
@@ -613,6 +651,15 @@ const Index = () => {
         onDelete={deleteConversation}
         open={sidebarOpen}
         onToggle={() => setSidebarOpen((s) => !s)}
+        onOpenSettings={() => setSettingsOpen(true)}
+      />
+
+      <SettingsDialog
+        open={settingsOpen}
+        onOpenChange={setSettingsOpen}
+        conversationsCount={conversations.length}
+        onExport={exportConversations}
+        onClearAll={clearAllConversations}
       />
 
       <main className="flex min-w-0 flex-1 flex-col">

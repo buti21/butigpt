@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, MessageSquare, Trash2, PanelLeftClose, PanelLeft, AlertTriangle } from "lucide-react";
+import { Plus, MessageSquare, Trash2, PanelLeftClose, PanelLeft, AlertTriangle, Settings as SettingsIcon } from "lucide-react";
 import { ButiLogo } from "./ButiLogo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -28,6 +28,7 @@ interface Props {
   onDelete: (id: string) => void;
   open: boolean;
   onToggle: () => void;
+  onOpenSettings: () => void;
 }
 
 export const Sidebar = ({
@@ -38,6 +39,7 @@ export const Sidebar = ({
   onDelete,
   open,
   onToggle,
+  onOpenSettings,
 }: Props) => {
   const [pendingDelete, setPendingDelete] = useState<Conversation | null>(null);
 
@@ -122,7 +124,17 @@ export const Sidebar = ({
           )}
         </div>
 
-        <div className="border-t border-sidebar-border px-4 py-3 text-xs text-muted-foreground">
+        <div className="border-t border-sidebar-border px-2 py-2">
+          <button
+            onClick={onOpenSettings}
+            className="flex w-full items-center gap-2 rounded-lg px-2.5 py-2 text-sm text-muted-foreground transition-all duration-200 hover:bg-sidebar-hover hover:text-sidebar-foreground"
+            aria-label="Setări"
+          >
+            <SettingsIcon className="h-4 w-4" />
+            <span>Setări</span>
+          </button>
+        </div>
+        <div className="border-t border-sidebar-border px-4 py-2 text-[11px] text-muted-foreground">
           Asistent AI personal
         </div>
       </aside>
