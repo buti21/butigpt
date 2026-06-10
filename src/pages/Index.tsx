@@ -146,24 +146,26 @@ const Index = () => {
 
   // Persist conversations & active id (localStorage = offline cache)
   useEffect(() => {
+    if (!saveHistory) return;
     try {
       localStorage.setItem(STORAGE_KEY, JSON.stringify(conversations));
     } catch {
       /* quota or serialization */
     }
-  }, [conversations]);
+  }, [conversations, saveHistory]);
   useEffect(() => {
+    if (!saveHistory) return;
     try {
       if (activeId) localStorage.setItem(ACTIVE_KEY, activeId);
       else localStorage.removeItem(ACTIVE_KEY);
     } catch {
       /* ignore */
     }
-  }, [activeId]);
+  }, [activeId, saveHistory]);
 
-  // Debounced cloud sync when logged in (skip while streaming)
+  // Debounced cloud sync when logged in (skip while streaming or history disabled)
   useEffect(() => {
-    if (!user || isStreaming) return;
+    if (!user || isStreaming || !saveHistory) return;
     const t = window.setTimeout(() => {
       const rows = conversations.map((c) => ({
         id: c.id,
@@ -182,7 +184,7 @@ const Index = () => {
         });
     }, 1200);
     return () => window.clearTimeout(t);
-  }, [conversations, user, isStreaming]);
+  }, [conversations, user, isStreaming, saveHistory]);
 
 
   const active = conversations.find((c) => c.id === activeId) ?? null;
