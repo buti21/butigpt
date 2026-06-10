@@ -7,6 +7,7 @@ import { AuthProvider } from "@/hooks/use-auth";
 import { SettingsProvider } from "@/hooks/use-settings";
 import Index from "./pages/Index.tsx";
 import Auth from "./pages/Auth.tsx";
+import Shared from "./pages/Shared.tsx";
 import NotFound from "./pages/NotFound.tsx";
 
 const queryClient = new QueryClient();
@@ -22,8 +23,10 @@ const App = () => (
             <Routes>
               <Route path="/" element={<Index />} />
               <Route path="/auth" element={<Auth />} />
+              <Route path="/s/:shareId" element={<Shared />} />
               <Route path="*" element={<NotFound />} />
             </Routes>
+
           </SettingsProvider>
         </AuthProvider>
       </BrowserRouter>

@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, MessageSquare, Trash2, PanelLeftClose, PanelLeft, AlertTriangle, Settings as SettingsIcon } from "lucide-react";
+import { Plus, MessageSquare, Trash2, PanelLeftClose, PanelLeft, AlertTriangle, Settings as SettingsIcon, Share2 } from "lucide-react";
 import { ButiLogo } from "./ButiLogo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -26,6 +26,7 @@ interface Props {
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
+  onShare: (c: Conversation) => void;
   open: boolean;
   onToggle: () => void;
   onOpenSettings: () => void;
@@ -37,6 +38,7 @@ export const Sidebar = ({
   onSelect,
   onNew,
   onDelete,
+  onShare,
   open,
   onToggle,
   onOpenSettings,
@@ -110,6 +112,17 @@ export const Sidebar = ({
                     <button
                       onClick={(e) => {
                         e.stopPropagation();
+                        onShare(c);
+                      }}
+                      className="flex-shrink-0 rounded p-1.5 text-muted-foreground opacity-100 transition-all duration-200 hover:text-primary hover:bg-primary/10 md:opacity-0 md:group-hover:opacity-100"
+                      aria-label="Partajează conversația"
+                      title="Partajează"
+                    >
+                      <Share2 className="h-3.5 w-3.5" />
+                    </button>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
                         setPendingDelete(c);
                       }}
                       className="flex-shrink-0 rounded p-1.5 text-muted-foreground opacity-100 transition-all duration-200 hover:text-destructive hover:bg-destructive/10 md:opacity-0 md:group-hover:opacity-100"
@@ -118,6 +131,7 @@ export const Sidebar = ({
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
                   </div>
+
                 </li>
               ))}
             </ul>
