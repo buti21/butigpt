@@ -41,7 +41,7 @@ import {
   AlertTriangle,
   Sparkles,
 } from "lucide-react";
-import { useSettings, type ThemeMode, type TypewriterSpeed } from "@/hooks/use-settings";
+import { useSettings, type ThemeMode, type TypewriterSpeed, type ModelChoice } from "@/hooks/use-settings";
 import { useAuth } from "@/hooks/use-auth";
 import { toast } from "@/hooks/use-toast";
 
