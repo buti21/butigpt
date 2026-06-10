@@ -653,6 +653,17 @@ const Index = () => {
           if (window.innerWidth < 768) setSidebarOpen(false);
         }}
         onDelete={deleteConversation}
+        onShare={(c) => {
+          if (!user) {
+            toast({
+              title: "Conectează-te pentru a partaja",
+              description: "Linkurile publice necesită un cont.",
+              variant: "destructive",
+            });
+            return;
+          }
+          setShareTarget({ id: c.id, title: c.title });
+        }}
         open={sidebarOpen}
         onToggle={() => setSidebarOpen((s) => !s)}
         onOpenSettings={() => setSettingsOpen(true)}
@@ -665,6 +676,14 @@ const Index = () => {
         onExport={exportConversations}
         onClearAll={clearAllConversations}
       />
+
+      <ShareDialog
+        open={!!shareTarget}
+        onOpenChange={(o) => !o && setShareTarget(null)}
+        conversationId={shareTarget?.id ?? null}
+        conversationTitle={shareTarget?.title}
+      />
+
 
       <main className="flex min-w-0 flex-1 flex-col">
         <header className="flex items-center justify-between border-b border-border/60 bg-background/60 px-4 py-3 backdrop-blur-md">
