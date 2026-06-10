@@ -429,7 +429,7 @@ const Index = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${ANON_KEY}`,
         },
-        body: JSON.stringify({ messages: payloadMessages }),
+        body: JSON.stringify({ messages: payloadMessages, model: modelChoice }),
         signal: controller.signal,
       });
 
