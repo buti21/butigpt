@@ -26,6 +26,7 @@ interface Props {
   onSelect: (id: string) => void;
   onNew: () => void;
   onDelete: (id: string) => void;
+  onShare: (c: Conversation) => void;
   open: boolean;
   onToggle: () => void;
   onOpenSettings: () => void;
@@ -37,6 +38,7 @@ export const Sidebar = ({
   onSelect,
   onNew,
   onDelete,
+  onShare,
   open,
   onToggle,
   onOpenSettings,
