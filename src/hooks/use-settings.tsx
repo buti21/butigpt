@@ -2,12 +2,16 @@ import { createContext, useContext, useEffect, useState, ReactNode } from "react
 
 export type ThemeMode = "dark" | "light" | "system";
 export type TypewriterSpeed = "slow" | "normal" | "fast" | "instant";
+export type ModelChoice = "fast" | "smart" | "lite";
 
 interface Settings {
   theme: ThemeMode;
   typewriterSpeed: TypewriterSpeed;
   autoTts: boolean;
   enterToSend: boolean;
+  model: ModelChoice;
+  saveHistory: boolean;
+  improveModel: boolean;
 }
 
 interface SettingsCtx extends Settings {
@@ -15,6 +19,9 @@ interface SettingsCtx extends Settings {
   setTypewriterSpeed: (s: TypewriterSpeed) => void;
   setAutoTts: (v: boolean) => void;
   setEnterToSend: (v: boolean) => void;
+  setModel: (m: ModelChoice) => void;
+  setSaveHistory: (v: boolean) => void;
+  setImproveModel: (v: boolean) => void;
 }
 
 const KEY = "butigpt:settings:v1";
@@ -24,6 +31,9 @@ const DEFAULTS: Settings = {
   typewriterSpeed: "normal",
   autoTts: false,
   enterToSend: true,
+  model: "fast",
+  saveHistory: true,
+  improveModel: false,
 };
 
 const Ctx = createContext<SettingsCtx | null>(null);
@@ -76,6 +86,9 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
         setTypewriterSpeed: (typewriterSpeed) => update({ typewriterSpeed }),
         setAutoTts: (autoTts) => update({ autoTts }),
         setEnterToSend: (enterToSend) => update({ enterToSend }),
+        setModel: (model) => update({ model }),
+        setSaveHistory: (saveHistory) => update({ saveHistory }),
+        setImproveModel: (improveModel) => update({ improveModel }),
       }}
     >
       {children}
