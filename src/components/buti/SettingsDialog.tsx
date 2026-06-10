@@ -83,6 +83,9 @@ export const SettingsDialog = ({
               <TabsTrigger value="chat" className="w-full justify-start data-[state=active]:bg-secondary">
                 Chat
               </TabsTrigger>
+              <TabsTrigger value="privacy" className="w-full justify-start data-[state=active]:bg-secondary">
+                Confidențialitate
+              </TabsTrigger>
               <TabsTrigger value="data" className="w-full justify-start data-[state=active]:bg-secondary">
                 Date
               </TabsTrigger>
