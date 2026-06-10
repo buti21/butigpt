@@ -125,6 +125,21 @@ export const SettingsDialog = ({
 
               {/* CHAT */}
               <TabsContent value="chat" className="m-0 space-y-6">
+                <Row label="Model" hint="Alege între viteză, echilibru și calitate maximă">
+                  <Select
+                    value={s.model}
+                    onValueChange={(v) => s.setModel(v as ModelChoice)}
+                  >
+                    <SelectTrigger className="w-48">
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="fast">ButiGPT Rapid (implicit)</SelectItem>
+                      <SelectItem value="smart">ButiGPT Pro (calitate)</SelectItem>
+                      <SelectItem value="lite">ButiGPT Lite (economic)</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </Row>
                 <Row label="Viteză animație typing" hint="Cât de repede apar literele răspunsului">
                   <Select
                     value={s.typewriterSpeed}
@@ -148,6 +163,27 @@ export const SettingsDialog = ({
                   <Switch checked={s.enterToSend} onCheckedChange={s.setEnterToSend} />
                 </Row>
               </TabsContent>
+
+              {/* PRIVACY */}
+              <TabsContent value="privacy" className="m-0 space-y-6">
+                <Row
+                  label="Salvează istoricul conversațiilor"
+                  hint="Când e oprit, mesajele noi nu sunt păstrate local sau în cloud"
+                >
+                  <Switch checked={s.saveHistory} onCheckedChange={s.setSaveHistory} />
+                </Row>
+                <Row
+                  label="Contribuie la îmbunătățirea modelului"
+                  hint="Permite folosirea anonimă a conversațiilor pentru evaluare"
+                >
+                  <Switch checked={s.improveModel} onCheckedChange={s.setImproveModel} />
+                </Row>
+                <div className="rounded-xl border border-border bg-surface-2 p-4 text-xs text-muted-foreground leading-relaxed">
+                  ButiGPT nu vinde datele tale. Conversațiile sunt vizibile doar pentru contul tău.
+                  Poți oricând să oprești salvarea sau să ștergi tot istoricul din tab-ul „Date".
+                </div>
+              </TabsContent>
+
 
               {/* DATA */}
               <TabsContent value="data" className="m-0 space-y-4">
