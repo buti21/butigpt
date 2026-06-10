@@ -80,7 +80,7 @@ const Index = () => {
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
 
-  const { typewriterSpeed } = useSettings();
+  const { typewriterSpeed, model: modelChoice, saveHistory } = useSettings();
   const speedMul =
     typewriterSpeed === "slow" ? 2.2 :
     typewriterSpeed === "fast" ? 0.4 :
