@@ -78,6 +78,7 @@ const Index = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [shareTarget, setShareTarget] = useState<{ id: string; title: string } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
 
