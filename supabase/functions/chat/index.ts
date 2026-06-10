@@ -62,8 +62,15 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages } = await req.json();
+    const { messages, model: modelChoice } = await req.json();
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
+
+    const MODEL_MAP: Record<string, string> = {
+      fast: "google/gemini-3-flash-preview",
+      smart: "google/gemini-2.5-pro",
+      lite: "google/gemini-3.1-flash-lite-preview",
+    };
+    const model = MODEL_MAP[modelChoice as string] ?? MODEL_MAP.fast;
 
     const upstream = await fetch(GATEWAY_URL, {
       method: "POST",
@@ -72,7 +79,7 @@ serve(async (req) => {
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
-        model: "google/gemini-3-flash-preview",
+        model,
         messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
         stream: true,
         tools: [
