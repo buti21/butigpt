@@ -62,7 +62,7 @@ serve(async (req) => {
   if (req.method === "OPTIONS") return new Response(null, { headers: corsHeaders });
 
   try {
-    const { messages, model: modelChoice } = await req.json();
+    const { messages, model: modelChoice, systemExtras } = await req.json();
     if (!LOVABLE_API_KEY) throw new Error("LOVABLE_API_KEY is not configured");
 
     const MODEL_MAP: Record<string, string> = {
@@ -72,6 +72,10 @@ serve(async (req) => {
     };
     const model = MODEL_MAP[modelChoice as string] ?? MODEL_MAP.fast;
 
+    const fullSystem = typeof systemExtras === "string" && systemExtras.trim()
+      ? `${SYSTEM_PROMPT}\n\n---\nPREFERINȚE UTILIZATOR (respectă-le strict):\n${systemExtras.trim()}`
+      : SYSTEM_PROMPT;
+
     const upstream = await fetch(GATEWAY_URL, {
       method: "POST",
       headers: {
@@ -80,7 +84,7 @@ serve(async (req) => {
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: "system", content: SYSTEM_PROMPT }, ...messages],
+        messages: [{ role: "system", content: fullSystem }, ...messages],
         stream: true,
         tools: [
           {
