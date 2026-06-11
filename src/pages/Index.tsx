@@ -82,11 +82,44 @@ const Index = () => {
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
 
-  const { typewriterSpeed, model: modelChoice, saveHistory } = useSettings();
+  const {
+    typewriterSpeed,
+    model: modelChoice,
+    saveHistory,
+    language,
+    tone,
+    customInstructions,
+    aboutYou,
+  } = useSettings();
   const speedMul =
     typewriterSpeed === "slow" ? 2.2 :
     typewriterSpeed === "fast" ? 0.4 :
     typewriterSpeed === "instant" ? 0 : 1;
+
+  const buildSystemExtras = () => {
+    const parts: string[] = [];
+    const langMap: Record<string, string> = {
+      ro: "Răspunde mereu în limba română.",
+      en: "Always respond in English.",
+      fr: "Réponds toujours en français.",
+      es: "Responde siempre en español.",
+      de: "Antworte immer auf Deutsch.",
+      it: "Rispondi sempre in italiano.",
+    };
+    if (language !== "auto" && langMap[language]) parts.push(langMap[language]);
+    const toneMap: Record<string, string> = {
+      casual: "Adoptă un ton relaxat, prietenos, ca între prieteni.",
+      formal: "Folosește un ton formal, profesionist și politicos.",
+      concise: "Răspunde cât mai concis posibil — fără introducere, doar esența.",
+      playful: "Folosește un ton jucăuș, cu umor subtil și emoji ocazionale.",
+      expert: "Răspunde ca un expert în domeniu, cu detalii tehnice riguroase.",
+    };
+    if (tone !== "default" && toneMap[tone]) parts.push(toneMap[tone]);
+    if (aboutYou.trim()) parts.push(`Despre utilizator: ${aboutYou.trim()}`);
+    if (customInstructions.trim()) parts.push(`Instrucțiuni: ${customInstructions.trim()}`);
+    return parts.join("\n\n");
+  };
+
 
   const { user } = useAuth();
   const userIdRef = useRef<string | null>(null);
@@ -431,7 +464,7 @@ const Index = () => {
           "Content-Type": "application/json",
           Authorization: `Bearer ${ANON_KEY}`,
         },
-        body: JSON.stringify({ messages: payloadMessages, model: modelChoice }),
+        body: JSON.stringify({ messages: payloadMessages, model: modelChoice, systemExtras: buildSystemExtras() }),
         signal: controller.signal,
       });
 
