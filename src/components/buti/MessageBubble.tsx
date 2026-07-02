@@ -104,7 +104,7 @@ export const MessageBubble = ({ message, streaming }: Props) => {
                 </div>
               )}
               {message.content && (
-                <div className="whitespace-pre-wrap text-foreground leading-relaxed">
+                <div className="whitespace-pre-wrap break-words text-foreground leading-relaxed">
                   {message.content}
                 </div>
               )}
