@@ -57,6 +57,27 @@ const buildUserApiContent = (text: string, images: string[]) => {
 
 const STORAGE_KEY = "butigpt:conversations:v1";
 const ACTIVE_KEY = "butigpt:active:v1";
+const DELETED_QUEUE_KEY = "butigpt:deleted-queue:v1";
+
+const isUuid = (s: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
+const loadDeletedQueue = (): string[] => {
+  try {
+    const raw = localStorage.getItem(DELETED_QUEUE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+};
+const saveDeletedQueue = (ids: string[]) => {
+  try {
+    localStorage.setItem(DELETED_QUEUE_KEY, JSON.stringify(ids));
+  } catch {
+    /* ignore */
+  }
+};
 
 const Index = () => {
   const [conversations, setConversations] = useState<ConversationState[]>(() => {
@@ -123,6 +144,7 @@ const Index = () => {
 
   const { user } = useAuth();
   const userIdRef = useRef<string | null>(null);
+  const deletedIdsRef = useRef<Set<string>>(new Set(loadDeletedQueue()));
 
   const abortRef = useRef<AbortController | null>(null);
   const stopFlagRef = useRef(false);
@@ -156,7 +178,8 @@ const Index = () => {
           console.error("load conversations", error);
           return;
         }
-        const loaded: ConversationState[] = (data ?? []).map((row) => ({
+        const filtered = (data ?? []).filter((r) => !deletedIdsRef.current.has(r.id));
+        const loaded: ConversationState[] = filtered.map((row) => ({
           id: row.id,
           title: row.title,
           updatedAt: new Date(row.updated_at).getTime(),
@@ -164,6 +187,19 @@ const Index = () => {
         }));
         setConversations(loaded);
         setActiveId(loaded[0]?.id ?? null);
+
+        // Retry any pending deletes from previous sessions
+        const pending = Array.from(deletedIdsRef.current).filter(isUuid);
+        if (pending.length) {
+          const { error: delErr } = await supabase
+            .from("conversations")
+            .delete()
+            .in("id", pending);
+          if (!delErr) {
+            deletedIdsRef.current.clear();
+            saveDeletedQueue([]);
+          }
+        }
       })();
     } else {
       // logged out: restore from localStorage
@@ -202,13 +238,32 @@ const Index = () => {
   useEffect(() => {
     if (!user || isStreaming || !saveHistory) return;
     const t = window.setTimeout(() => {
-      const rows = conversations.map((c) => ({
-        id: c.id,
-        user_id: user.id,
-        title: c.title,
-        messages: c.messages as unknown as import("@/integrations/supabase/types").Json,
-        updated_at: new Date(c.updatedAt).toISOString(),
-      }));
+      // Process pending deletions FIRST so the server can't resurrect rows on refresh
+      const pendingDeletes = Array.from(deletedIdsRef.current).filter(isUuid);
+      if (pendingDeletes.length) {
+        supabase
+          .from("conversations")
+          .delete()
+          .in("id", pendingDeletes)
+          .then(({ error }) => {
+            if (error) {
+              console.error("delete sync error", error);
+            } else {
+              pendingDeletes.forEach((id) => deletedIdsRef.current.delete(id));
+              saveDeletedQueue(Array.from(deletedIdsRef.current));
+            }
+          });
+      }
+
+      const rows = conversations
+        .filter((c) => isUuid(c.id))
+        .map((c) => ({
+          id: c.id,
+          user_id: user.id,
+          title: c.title,
+          messages: c.messages as unknown as import("@/integrations/supabase/types").Json,
+          updated_at: new Date(c.updatedAt).toISOString(),
+        }));
 
       if (!rows.length) return;
       supabase
@@ -262,9 +317,19 @@ const Index = () => {
   const deleteConversation = (id: string) => {
     setConversations((prev) => prev.filter((c) => c.id !== id));
     if (activeId === id) setActiveId(null);
-    if (user) {
+    // Queue for guaranteed cloud deletion (retried on next sync/login)
+    if (isUuid(id)) {
+      deletedIdsRef.current.add(id);
+      saveDeletedQueue(Array.from(deletedIdsRef.current));
+    }
+    if (user && isUuid(id)) {
       supabase.from("conversations").delete().eq("id", id).then(({ error }) => {
-        if (error) console.error("delete error", error);
+        if (error) {
+          console.error("delete error", error);
+        } else {
+          deletedIdsRef.current.delete(id);
+          saveDeletedQueue(Array.from(deletedIdsRef.current));
+        }
       });
     }
   };
@@ -273,9 +338,17 @@ const Index = () => {
     const ids = conversations.map((c) => c.id);
     setConversations([]);
     setActiveId(null);
-    if (user && ids.length) {
-      const { error } = await supabase.from("conversations").delete().in("id", ids);
-      if (error) console.error("clear all error", error);
+    const uuidIds = ids.filter(isUuid);
+    uuidIds.forEach((i) => deletedIdsRef.current.add(i));
+    saveDeletedQueue(Array.from(deletedIdsRef.current));
+    if (user && uuidIds.length) {
+      const { error } = await supabase.from("conversations").delete().in("id", uuidIds);
+      if (error) {
+        console.error("clear all error", error);
+      } else {
+        uuidIds.forEach((i) => deletedIdsRef.current.delete(i));
+        saveDeletedQueue(Array.from(deletedIdsRef.current));
+      }
     }
     toast({ title: "Conversații șterse", description: "Toate conversațiile au fost eliminate." });
   };

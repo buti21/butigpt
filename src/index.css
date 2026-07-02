@@ -184,26 +184,38 @@
 /* Markdown prose tweaks */
 .buti-prose {
   @apply text-foreground leading-relaxed;
+  overflow-wrap: anywhere;
+  word-break: break-word;
 }
 .buti-prose p { @apply my-3; }
-.buti-prose h1 { @apply text-2xl font-semibold mt-6 mb-3; }
-.buti-prose h2 { @apply text-xl font-semibold mt-5 mb-2; }
-.buti-prose h3 { @apply text-lg font-semibold mt-4 mb-2; }
-.buti-prose ul { @apply list-disc pl-6 my-3 space-y-1; }
-.buti-prose ol { @apply list-decimal pl-6 my-3 space-y-1; }
-.buti-prose a { @apply text-primary underline underline-offset-2 hover:text-primary-glow; }
+.buti-prose h1 { @apply text-xl sm:text-2xl font-semibold mt-6 mb-3; }
+.buti-prose h2 { @apply text-lg sm:text-xl font-semibold mt-5 mb-2; }
+.buti-prose h3 { @apply text-base sm:text-lg font-semibold mt-4 mb-2; }
+.buti-prose ul { @apply list-disc pl-5 sm:pl-6 my-3 space-y-1; }
+.buti-prose ol { @apply list-decimal pl-5 sm:pl-6 my-3 space-y-1; }
+.buti-prose a { @apply text-primary underline underline-offset-2 hover:text-primary-glow break-all; }
 .buti-prose strong { @apply font-semibold; }
 .buti-prose blockquote { @apply border-l-2 border-primary/60 pl-4 italic text-muted-foreground my-3; }
 .buti-prose code:not(pre code) {
   @apply bg-secondary text-foreground px-1.5 py-0.5 rounded text-[0.875em] font-mono;
+  overflow-wrap: anywhere;
 }
 .buti-prose pre {
-  @apply bg-[hsl(var(--surface-1))] border border-border rounded-xl p-4 my-4 overflow-x-auto text-sm;
+  @apply bg-[hsl(var(--surface-1))] border border-border rounded-xl p-3 sm:p-4 my-4 overflow-x-auto text-xs sm:text-sm;
+  max-width: 100%;
 }
-.buti-prose pre code { @apply font-mono text-foreground; }
-.buti-prose table { @apply w-full my-4 border-collapse; }
+.buti-prose pre code { @apply font-mono text-foreground; white-space: pre; }
+.buti-prose table { @apply w-full my-4 border-collapse text-sm; display: block; overflow-x: auto; }
 .buti-prose th, .buti-prose td { @apply border border-border px-3 py-2 text-left; }
 .buti-prose th { @apply bg-secondary font-semibold; }
+
+/* KaTeX inline: prevent overflow on long formulas */
+.buti-prose .katex { font-size: 1em; }
+.buti-prose .katex-display {
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.25rem 0;
+}
 
 /* Caret blink for streaming */
 @keyframes buti-blink {

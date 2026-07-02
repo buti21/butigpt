@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import remarkMath from "remark-math";
+import rehypeKatex from "rehype-katex";
+import "katex/dist/katex.min.css";
 import { ButiLogo } from "./ButiLogo";
 import { User, Copy, Check, Volume2, Loader2, Square, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -101,7 +104,7 @@ export const MessageBubble = ({ message, streaming }: Props) => {
                 </div>
               )}
               {message.content && (
-                <div className="whitespace-pre-wrap text-foreground leading-relaxed">
+                <div className="whitespace-pre-wrap break-words text-foreground leading-relaxed">
                   {message.content}
                 </div>
               )}
@@ -111,8 +114,11 @@ export const MessageBubble = ({ message, streaming }: Props) => {
               {streaming && !message.content ? (
                 <ThinkingIndicator />
               ) : (
-                <div className="buti-prose">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <div className="buti-prose break-words">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkMath]}
+                    rehypePlugins={[rehypeKatex]}
+                  >
                     {message.content || "…"}
                   </ReactMarkdown>
                 </div>
