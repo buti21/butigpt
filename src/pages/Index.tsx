@@ -238,13 +238,32 @@ const Index = () => {
   useEffect(() => {
     if (!user || isStreaming || !saveHistory) return;
     const t = window.setTimeout(() => {
-      const rows = conversations.map((c) => ({
-        id: c.id,
-        user_id: user.id,
-        title: c.title,
-        messages: c.messages as unknown as import("@/integrations/supabase/types").Json,
-        updated_at: new Date(c.updatedAt).toISOString(),
-      }));
+      // Process pending deletions FIRST so the server can't resurrect rows on refresh
+      const pendingDeletes = Array.from(deletedIdsRef.current).filter(isUuid);
+      if (pendingDeletes.length) {
+        supabase
+          .from("conversations")
+          .delete()
+          .in("id", pendingDeletes)
+          .then(({ error }) => {
+            if (error) {
+              console.error("delete sync error", error);
+            } else {
+              pendingDeletes.forEach((id) => deletedIdsRef.current.delete(id));
+              saveDeletedQueue(Array.from(deletedIdsRef.current));
+            }
+          });
+      }
+
+      const rows = conversations
+        .filter((c) => isUuid(c.id))
+        .map((c) => ({
+          id: c.id,
+          user_id: user.id,
+          title: c.title,
+          messages: c.messages as unknown as import("@/integrations/supabase/types").Json,
+          updated_at: new Date(c.updatedAt).toISOString(),
+        }));
 
       if (!rows.length) return;
       supabase
