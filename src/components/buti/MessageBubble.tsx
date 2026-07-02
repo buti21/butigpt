@@ -114,8 +114,11 @@ export const MessageBubble = ({ message, streaming }: Props) => {
               {streaming && !message.content ? (
                 <ThinkingIndicator />
               ) : (
-                <div className="buti-prose">
-                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                <div className="buti-prose break-words">
+                  <ReactMarkdown
+                    remarkPlugins={[remarkGfm, remarkMath]}
+                    rehypePlugins={[rehypeKatex]}
+                  >
                     {message.content || "…"}
                   </ReactMarkdown>
                 </div>
