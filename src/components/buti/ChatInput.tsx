@@ -219,8 +219,8 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
   };
 
   return (
-    <div className="border-t border-border bg-background/60 backdrop-blur-md">
-      <div className="mx-auto max-w-3xl px-4 py-4">
+    <div className="border-t border-border bg-background/60 backdrop-blur-md pb-[env(safe-area-inset-bottom)]">
+      <div className="mx-auto max-w-3xl px-3 sm:px-4 py-3 sm:py-4">
         <div className="rounded-2xl border border-border bg-surface-1 shadow-soft focus-within:border-primary/60 focus-within:ring-2 focus-within:ring-primary/20 transition-[border,box-shadow] duration-200">
           {images.length > 0 && (
             <div className="flex flex-wrap gap-2 border-b border-border px-3 pt-3 pb-2">
