@@ -178,7 +178,8 @@ const Index = () => {
           console.error("load conversations", error);
           return;
         }
-        const loaded: ConversationState[] = (data ?? []).map((row) => ({
+        const filtered = (data ?? []).filter((r) => !deletedIdsRef.current.has(r.id));
+        const loaded: ConversationState[] = filtered.map((row) => ({
           id: row.id,
           title: row.title,
           updatedAt: new Date(row.updated_at).getTime(),
@@ -186,6 +187,19 @@ const Index = () => {
         }));
         setConversations(loaded);
         setActiveId(loaded[0]?.id ?? null);
+
+        // Retry any pending deletes from previous sessions
+        const pending = Array.from(deletedIdsRef.current).filter(isUuid);
+        if (pending.length) {
+          const { error: delErr } = await supabase
+            .from("conversations")
+            .delete()
+            .in("id", pending);
+          if (!delErr) {
+            deletedIdsRef.current.clear();
+            saveDeletedQueue([]);
+          }
+        }
       })();
     } else {
       // logged out: restore from localStorage
