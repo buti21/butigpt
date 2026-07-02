@@ -57,6 +57,27 @@ const buildUserApiContent = (text: string, images: string[]) => {
 
 const STORAGE_KEY = "butigpt:conversations:v1";
 const ACTIVE_KEY = "butigpt:active:v1";
+const DELETED_QUEUE_KEY = "butigpt:deleted-queue:v1";
+
+const isUuid = (s: string) =>
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(s);
+
+const loadDeletedQueue = (): string[] => {
+  try {
+    const raw = localStorage.getItem(DELETED_QUEUE_KEY);
+    const parsed = raw ? JSON.parse(raw) : [];
+    return Array.isArray(parsed) ? parsed.filter((x) => typeof x === "string") : [];
+  } catch {
+    return [];
+  }
+};
+const saveDeletedQueue = (ids: string[]) => {
+  try {
+    localStorage.setItem(DELETED_QUEUE_KEY, JSON.stringify(ids));
+  } catch {
+    /* ignore */
+  }
+};
 
 const Index = () => {
   const [conversations, setConversations] = useState<ConversationState[]>(() => {
