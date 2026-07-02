@@ -144,6 +144,7 @@ const Index = () => {
 
   const { user } = useAuth();
   const userIdRef = useRef<string | null>(null);
+  const deletedIdsRef = useRef<Set<string>>(new Set(loadDeletedQueue()));
 
   const abortRef = useRef<AbortController | null>(null);
   const stopFlagRef = useRef(false);
