@@ -792,7 +792,7 @@ const Index = () => {
 
 
       <main className="flex min-w-0 flex-1 flex-col">
-        <header className="flex items-center justify-between border-b border-border/60 bg-background/60 px-4 py-3 backdrop-blur-md">
+        <header className="flex items-center justify-between border-b border-border/60 bg-background/60 px-3 sm:px-4 py-3 backdrop-blur-md pt-[max(env(safe-area-inset-top),0.75rem)] pr-[max(env(safe-area-inset-right),0.75rem)]">
           <div className="flex items-center gap-2">
             {!sidebarOpen && <SidebarToggleFloating onClick={() => setSidebarOpen(true)} />}
             <div className="flex items-center gap-2">
