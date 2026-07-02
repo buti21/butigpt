@@ -317,9 +317,19 @@ const Index = () => {
   const deleteConversation = (id: string) => {
     setConversations((prev) => prev.filter((c) => c.id !== id));
     if (activeId === id) setActiveId(null);
-    if (user) {
+    // Queue for guaranteed cloud deletion (retried on next sync/login)
+    if (isUuid(id)) {
+      deletedIdsRef.current.add(id);
+      saveDeletedQueue(Array.from(deletedIdsRef.current));
+    }
+    if (user && isUuid(id)) {
       supabase.from("conversations").delete().eq("id", id).then(({ error }) => {
-        if (error) console.error("delete error", error);
+        if (error) {
+          console.error("delete error", error);
+        } else {
+          deletedIdsRef.current.delete(id);
+          saveDeletedQueue(Array.from(deletedIdsRef.current));
+        }
       });
     }
   };
@@ -328,9 +338,17 @@ const Index = () => {
     const ids = conversations.map((c) => c.id);
     setConversations([]);
     setActiveId(null);
-    if (user && ids.length) {
-      const { error } = await supabase.from("conversations").delete().in("id", ids);
-      if (error) console.error("clear all error", error);
+    const uuidIds = ids.filter(isUuid);
+    uuidIds.forEach((i) => deletedIdsRef.current.add(i));
+    saveDeletedQueue(Array.from(deletedIdsRef.current));
+    if (user && uuidIds.length) {
+      const { error } = await supabase.from("conversations").delete().in("id", uuidIds);
+      if (error) {
+        console.error("clear all error", error);
+      } else {
+        uuidIds.forEach((i) => deletedIdsRef.current.delete(i));
+        saveDeletedQueue(Array.from(deletedIdsRef.current));
+      }
     }
     toast({ title: "Conversații șterse", description: "Toate conversațiile au fost eliminate." });
   };
