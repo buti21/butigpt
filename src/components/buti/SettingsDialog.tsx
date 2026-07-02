@@ -87,7 +87,15 @@ export const SettingsDialog = ({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="w-[calc(100vw-1rem)] max-w-2xl max-h-[90vh] border-border bg-surface-1 p-0 gap-0 overflow-hidden flex flex-col">
+        <DialogContent
+          className={cn(
+            "border-border bg-surface-1 p-0 gap-0 overflow-hidden flex flex-col",
+            // Fullscreen on mobile, centered card on ≥sm
+            "w-screen h-[100dvh] max-w-none rounded-none translate-x-0 translate-y-0 top-0 left-0 data-[state=open]:slide-in-from-bottom-4",
+            "sm:w-[calc(100vw-2rem)] sm:max-w-2xl sm:h-auto sm:max-h-[90vh] sm:rounded-xl sm:top-[50%] sm:left-[50%] sm:translate-x-[-50%] sm:translate-y-[-50%]",
+            "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] sm:pt-0 sm:pb-0"
+          )}
+        >
           <DialogHeader className="px-5 sm:px-6 pt-4 pb-3 border-b border-border flex-shrink-0">
             <DialogTitle className="text-lg">Setări</DialogTitle>
             <DialogDescription className="sr-only">
@@ -96,27 +104,31 @@ export const SettingsDialog = ({
           </DialogHeader>
 
           <Tabs defaultValue="general" className="flex flex-col sm:flex-row flex-1 min-h-0">
-            <TabsList className="flex sm:flex-col h-auto justify-start gap-1 bg-transparent border-b sm:border-b-0 sm:border-r border-border p-2 sm:p-3 sm:w-44 rounded-none overflow-x-auto sm:overflow-x-visible flex-shrink-0 scrollbar-thin">
-              {[
-                ["general", "General"],
-                ["personalize", "Personalizare"],
-                ["chat", "Chat"],
-                ["voice", "Voce"],
-                ["privacy", "Confidențialitate"],
-                ["data", "Date"],
-                ["account", "Cont"],
-                ["labs", "Laborator"],
-                ["about", "Despre"],
-              ].map(([v, label]) => (
-                <TabsTrigger
-                  key={v}
-                  value={v}
-                  className="sm:w-full justify-start data-[state=active]:bg-secondary whitespace-nowrap text-xs sm:text-sm"
-                >
-                  {label}
-                </TabsTrigger>
-              ))}
-            </TabsList>
+            <div className="relative sm:contents flex-shrink-0">
+              <TabsList className="flex sm:flex-col h-auto justify-start gap-1 bg-transparent border-b sm:border-b-0 sm:border-r border-border p-2 sm:p-3 sm:w-44 rounded-none overflow-x-auto sm:overflow-x-visible flex-shrink-0 scrollbar-thin w-full">
+                {[
+                  ["general", "General"],
+                  ["personalize", "Personalizare"],
+                  ["chat", "Chat"],
+                  ["voice", "Voce"],
+                  ["privacy", "Confidențialitate"],
+                  ["data", "Date"],
+                  ["account", "Cont"],
+                  ["labs", "Laborator"],
+                  ["about", "Despre"],
+                ].map(([v, label]) => (
+                  <TabsTrigger
+                    key={v}
+                    value={v}
+                    className="sm:w-full justify-start data-[state=active]:bg-secondary whitespace-nowrap text-xs sm:text-sm"
+                  >
+                    {label}
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+              {/* Fade hint that tabs scroll horizontally on mobile */}
+              <div className="pointer-events-none absolute right-0 top-0 h-full w-8 bg-gradient-to-l from-surface-1 to-transparent sm:hidden" />
+            </div>
 
             <div className="flex-1 px-5 sm:px-6 py-5 overflow-y-auto scrollbar-thin min-h-0">
               {/* GENERAL */}

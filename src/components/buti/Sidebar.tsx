@@ -57,7 +57,8 @@ export const Sidebar = ({
 
       <aside
         className={cn(
-          "fixed inset-y-0 left-0 z-40 flex w-[260px] flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-300 ease-out md:static md:translate-x-0",
+          "fixed inset-y-0 left-0 z-40 flex w-[85vw] max-w-[300px] flex-col border-r border-sidebar-border bg-sidebar transition-transform duration-300 ease-out md:static md:w-[260px] md:max-w-none md:translate-x-0",
+          "pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)]",
           open ? "translate-x-0" : "-translate-x-full md:w-0 md:overflow-hidden md:border-r-0",
         )}
       >
