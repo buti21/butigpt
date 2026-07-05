@@ -41,6 +41,7 @@ interface Props {
   disabled?: boolean;
   externalImages?: AttachedImage[];
   onConsumeExternal?: () => void;
+  enterToSend?: boolean;
 }
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB per image safeguard
