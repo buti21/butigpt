@@ -57,7 +57,7 @@ const fileToDataUrl = (file: File): Promise<string> =>
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
-export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImages, onConsumeExternal }: Props) => {
+export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImages, onConsumeExternal, enterToSend = true }: Props) => {
   const [value, setValue] = useState("");
   const [images, setImages] = useState<AttachedImage[]>([]);
   const [files, setFiles] = useState<AttachedFile[]>([]);
