@@ -111,6 +111,8 @@ const Index = () => {
     tone,
     customInstructions,
     aboutYou,
+    followUps,
+    enterToSend,
   } = useSettings();
   const speedMul =
     typewriterSpeed === "slow" ? 2.2 :
@@ -138,6 +140,7 @@ const Index = () => {
     if (tone !== "default" && toneMap[tone]) parts.push(toneMap[tone]);
     if (aboutYou.trim()) parts.push(`Despre utilizator: ${aboutYou.trim()}`);
     if (customInstructions.trim()) parts.push(`Instrucțiuni: ${customInstructions.trim()}`);
+    if (followUps) parts.push("La finalul fiecărui răspuns, adaugă o secțiune „Următoarele întrebări:” cu 2-3 sugestii scurte de follow-up, fiecare pe rând nou, prefixată cu „→ ”.");
     return parts.join("\n\n");
   };
 
