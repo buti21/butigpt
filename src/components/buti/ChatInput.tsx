@@ -382,7 +382,7 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
               onPaste={onPaste}
               rows={1}
               placeholder="Scrie un mesaj sau lipește o imagine (Ctrl+V)…"
-              className="max-h-[240px] flex-1 resize-none bg-transparent px-2 py-2 text-[15px] leading-6 text-foreground placeholder:text-muted-foreground focus:outline-none"
+              className="max-h-[240px] flex-1 resize-none bg-transparent px-2 py-2 text-base sm:text-[15px] leading-6 text-foreground placeholder:text-muted-foreground focus:outline-none"
               disabled={disabled}
             />
 
