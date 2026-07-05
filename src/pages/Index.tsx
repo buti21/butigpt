@@ -456,7 +456,7 @@ const Index = () => {
         messages: [
           ...c.messages,
           userMsg,
-          { id: assistantId, role: "assistant", content: "" },
+          { id: assistantId, role: "assistant", content: "", createdAt: Date.now() },
         ],
       };
     });
