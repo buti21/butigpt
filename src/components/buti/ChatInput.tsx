@@ -197,9 +197,15 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
   };
 
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      submit();
+    if (e.key === "Enter") {
+      if (enterToSend && !e.shiftKey) {
+        e.preventDefault();
+        submit();
+      } else if (!enterToSend && (e.ctrlKey || e.metaKey)) {
+        // When Enter=newline, allow Ctrl/Cmd+Enter to send
+        e.preventDefault();
+        submit();
+      }
     }
   };
 
