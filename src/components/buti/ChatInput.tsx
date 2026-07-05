@@ -41,6 +41,7 @@ interface Props {
   disabled?: boolean;
   externalImages?: AttachedImage[];
   onConsumeExternal?: () => void;
+  enterToSend?: boolean;
 }
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB per image safeguard
@@ -56,7 +57,7 @@ const fileToDataUrl = (file: File): Promise<string> =>
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
-export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImages, onConsumeExternal }: Props) => {
+export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImages, onConsumeExternal, enterToSend = true }: Props) => {
   const [value, setValue] = useState("");
   const [images, setImages] = useState<AttachedImage[]>([]);
   const [files, setFiles] = useState<AttachedFile[]>([]);
@@ -196,9 +197,15 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
   };
 
   const onKey = (e: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === "Enter" && !e.shiftKey) {
-      e.preventDefault();
-      submit();
+    if (e.key === "Enter") {
+      if (enterToSend && !e.shiftKey) {
+        e.preventDefault();
+        submit();
+      } else if (!enterToSend && (e.ctrlKey || e.metaKey)) {
+        // When Enter=newline, allow Ctrl/Cmd+Enter to send
+        e.preventDefault();
+        submit();
+      }
     }
   };
 
@@ -375,7 +382,7 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
               onPaste={onPaste}
               rows={1}
               placeholder="Scrie un mesaj sau lipește o imagine (Ctrl+V)…"
-              className="max-h-[240px] flex-1 resize-none bg-transparent px-2 py-2 text-[15px] leading-6 text-foreground placeholder:text-muted-foreground focus:outline-none"
+              className="max-h-[240px] flex-1 resize-none bg-transparent px-2 py-2 text-base sm:text-[15px] leading-6 text-foreground placeholder:text-muted-foreground focus:outline-none"
               disabled={disabled}
             />
 

@@ -158,11 +158,31 @@
     @apply h-full;
   }
 
+  html {
+    /* Prevent iOS text auto-inflation on rotate */
+    -webkit-text-size-adjust: 100%;
+    text-size-adjust: 100%;
+  }
+
   body {
     @apply bg-background text-foreground antialiased;
     background-image: var(--gradient-bg);
     background-attachment: fixed;
     font-feature-settings: "cv11", "ss01";
+    -webkit-tap-highlight-color: transparent;
+    overscroll-behavior-y: none;
+  }
+
+  /* iOS Safari: smooth momentum scrolling in overflow containers */
+  .scrollbar-thin, [data-scroll], .overflow-y-auto, .overflow-x-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+
+  /* Prevent iOS from zooming on input focus */
+  @supports (-webkit-touch-callout: none) {
+    input, textarea, select {
+      font-size: 16px;
+    }
   }
 }
 

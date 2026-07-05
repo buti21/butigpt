@@ -111,6 +111,8 @@ const Index = () => {
     tone,
     customInstructions,
     aboutYou,
+    followUps,
+    enterToSend,
   } = useSettings();
   const speedMul =
     typewriterSpeed === "slow" ? 2.2 :
@@ -138,6 +140,7 @@ const Index = () => {
     if (tone !== "default" && toneMap[tone]) parts.push(toneMap[tone]);
     if (aboutYou.trim()) parts.push(`Despre utilizator: ${aboutYou.trim()}`);
     if (customInstructions.trim()) parts.push(`Instrucțiuni: ${customInstructions.trim()}`);
+    if (followUps) parts.push("La finalul fiecărui răspuns, adaugă o secțiune „Următoarele întrebări:” cu 2-3 sugestii scurte de follow-up, fiecare pe rând nou, prefixată cu „→ ”.");
     return parts.join("\n\n");
   };
 
@@ -430,6 +433,7 @@ const Index = () => {
       role: "user",
       content: userBubbleText,
       images: imageUrls.length ? imageUrls : undefined,
+      createdAt: Date.now(),
     };
     const assistantId = uid();
 
@@ -452,7 +456,7 @@ const Index = () => {
         messages: [
           ...c.messages,
           userMsg,
-          { id: assistantId, role: "assistant", content: "" },
+          { id: assistantId, role: "assistant", content: "", createdAt: Date.now() },
         ],
       };
     });
@@ -729,7 +733,7 @@ const Index = () => {
 
   return (
     <div
-      className="relative flex h-screen w-full overflow-hidden bg-background text-foreground"
+      className="relative flex h-[100dvh] w-full overflow-hidden bg-background text-foreground"
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDragOver={onDragOver}
@@ -839,6 +843,7 @@ const Index = () => {
           isStreaming={isStreaming}
           externalImages={pendingDropImages}
           onConsumeExternal={() => setPendingDropImages([])}
+          enterToSend={enterToSend}
         />
       </main>
     </div>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSettings } from "@/hooks/use-settings";
 
 const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tts`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
@@ -8,6 +9,7 @@ let currentAudio: HTMLAudioElement | null = null;
 let currentSetter: ((v: boolean) => void) | null = null;
 
 export function useTTS() {
+  const { ttsSpeed } = useSettings();
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -62,6 +64,9 @@ export function useTTS() {
         if (!data?.audioContent) throw new Error("No audio");
 
         const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
+        try {
+          audio.playbackRate = Math.max(0.5, Math.min(2, ttsSpeed || 1));
+        } catch { /* ignore */ }
         audioRef.current = audio;
         currentAudio = audio;
         currentSetter = setIsPlaying;
@@ -92,7 +97,7 @@ export function useTTS() {
         setIsLoading(false);
       }
     },
-    [isLoading, isPlaying, stop],
+    [isLoading, isPlaying, stop, ttsSpeed],
   );
 
   useEffect(() => {

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -8,6 +8,7 @@ import { ButiLogo } from "./ButiLogo";
 import { User, Copy, Check, Volume2, Loader2, Square, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTTS } from "@/hooks/use-tts";
+import { useSettings } from "@/hooks/use-settings";
 import { toast } from "@/hooks/use-toast";
 import { ImageLightbox } from "./ImageLightbox";
 import {
@@ -25,6 +26,7 @@ export interface ChatMessage {
   content: string;
   images?: string[];
   presentation?: PresentationSpec;
+  createdAt?: number;
 }
 
 interface Props {
@@ -32,11 +34,29 @@ interface Props {
   streaming?: boolean;
 }
 
+const formatTime = (ts: number) => {
+  try {
+    return new Date(ts).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+};
+
 export const MessageBubble = ({ message, streaming }: Props) => {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const { isLoading: ttsLoading, isPlaying, play, stop } = useTTS();
+  const { compactMode, showTimestamps, autoTts } = useSettings();
+  const autoPlayedRef = useRef(false);
+
+  // Auto TTS for assistant messages once streaming completes
+  useEffect(() => {
+    if (autoTts && !isUser && !streaming && message.content && !autoPlayedRef.current) {
+      autoPlayedRef.current = true;
+      play(message.content);
+    }
+  }, [autoTts, isUser, streaming, message.content, play]);
 
   const handleCopy = async () => {
     if (!message.content) return;
@@ -67,21 +87,25 @@ export const MessageBubble = ({ message, streaming }: Props) => {
 
   return (
     <div className="w-full">
-      <div className="mx-auto flex max-w-3xl gap-4 px-4 py-5">
+      <div className={"mx-auto flex max-w-3xl gap-4 px-4 " + (compactMode ? "py-2" : "py-5")}>
         <div className="flex-shrink-0 pt-1">
           {isUser ? (
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-secondary text-foreground">
-              <User className="h-4 w-4" />
+            <div className={"flex items-center justify-center rounded-xl bg-secondary text-foreground " + (compactMode ? "h-7 w-7" : "h-9 w-9")}>
+              <User className={compactMode ? "h-3.5 w-3.5" : "h-4 w-4"} />
             </div>
           ) : (
-            <ButiLogo className="h-9 w-9" />
+            <ButiLogo className={compactMode ? "h-7 w-7" : "h-9 w-9"} />
           )}
         </div>
 
         <div className="min-w-0 flex-1">
-          <div className="mb-1 text-xs font-medium text-muted-foreground">
-            {isUser ? "Tu" : "ButiGPT"}
+          <div className="mb-1 flex items-center gap-2 text-xs font-medium text-muted-foreground">
+            <span>{isUser ? "Tu" : "ButiGPT"}</span>
+            {showTimestamps && message.createdAt && (
+              <span className="text-[10px] font-normal opacity-70">{formatTime(message.createdAt)}</span>
+            )}
           </div>
+
 
           {isUser ? (
             <div className="space-y-3">
