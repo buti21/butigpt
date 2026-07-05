@@ -843,6 +843,7 @@ const Index = () => {
           isStreaming={isStreaming}
           externalImages={pendingDropImages}
           onConsumeExternal={() => setPendingDropImages([])}
+          enterToSend={enterToSend}
         />
       </main>
     </div>
