@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useSettings } from "@/hooks/use-settings";
 
 const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tts`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
@@ -8,6 +9,7 @@ let currentAudio: HTMLAudioElement | null = null;
 let currentSetter: ((v: boolean) => void) | null = null;
 
 export function useTTS() {
+  const { ttsSpeed } = useSettings();
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
