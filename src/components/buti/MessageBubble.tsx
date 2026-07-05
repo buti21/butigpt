@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import remarkMath from "remark-math";
@@ -8,6 +8,7 @@ import { ButiLogo } from "./ButiLogo";
 import { User, Copy, Check, Volume2, Loader2, Square, Download } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTTS } from "@/hooks/use-tts";
+import { useSettings } from "@/hooks/use-settings";
 import { toast } from "@/hooks/use-toast";
 import { ImageLightbox } from "./ImageLightbox";
 import {
@@ -25,6 +26,7 @@ export interface ChatMessage {
   content: string;
   images?: string[];
   presentation?: PresentationSpec;
+  createdAt?: number;
 }
 
 interface Props {
@@ -32,11 +34,29 @@ interface Props {
   streaming?: boolean;
 }
 
+const formatTime = (ts: number) => {
+  try {
+    return new Date(ts).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" });
+  } catch {
+    return "";
+  }
+};
+
 export const MessageBubble = ({ message, streaming }: Props) => {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
   const { isLoading: ttsLoading, isPlaying, play, stop } = useTTS();
+  const { compactMode, showTimestamps, autoTts } = useSettings();
+  const autoPlayedRef = useRef(false);
+
+  // Auto TTS for assistant messages once streaming completes
+  useEffect(() => {
+    if (autoTts && !isUser && !streaming && message.content && !autoPlayedRef.current) {
+      autoPlayedRef.current = true;
+      play(message.content);
+    }
+  }, [autoTts, isUser, streaming, message.content, play]);
 
   const handleCopy = async () => {
     if (!message.content) return;
