@@ -733,7 +733,7 @@ const Index = () => {
 
   return (
     <div
-      className="relative flex h-screen w-full overflow-hidden bg-background text-foreground"
+      className="relative flex h-[100dvh] w-full overflow-hidden bg-background text-foreground"
       onDragEnter={onDragEnter}
       onDragLeave={onDragLeave}
       onDragOver={onDragOver}
