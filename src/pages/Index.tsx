@@ -433,6 +433,7 @@ const Index = () => {
       role: "user",
       content: userBubbleText,
       images: imageUrls.length ? imageUrls : undefined,
+      createdAt: Date.now(),
     };
     const assistantId = uid();
 
