@@ -64,6 +64,9 @@ export function useTTS() {
         if (!data?.audioContent) throw new Error("No audio");
 
         const audio = new Audio(`data:audio/mpeg;base64,${data.audioContent}`);
+        try {
+          audio.playbackRate = Math.max(0.5, Math.min(2, ttsSpeed || 1));
+        } catch { /* ignore */ }
         audioRef.current = audio;
         currentAudio = audio;
         currentSetter = setIsPlaying;
