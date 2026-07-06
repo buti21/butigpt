@@ -44,7 +44,9 @@ export const Sidebar = ({
   open,
   onToggle,
   onOpenSettings,
+  onStartVoiceCall,
 }: Props) => {
+
   const [pendingDelete, setPendingDelete] = useState<Conversation | null>(null);
 
   return (
