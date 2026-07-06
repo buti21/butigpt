@@ -777,6 +777,10 @@ const Index = () => {
         open={sidebarOpen}
         onToggle={() => setSidebarOpen((s) => !s)}
         onOpenSettings={() => setSettingsOpen(true)}
+        onStartVoiceCall={() => {
+          setVoiceCallOpen(true);
+          if (window.innerWidth < 768) setSidebarOpen(false);
+        }}
       />
 
       <SettingsDialog
@@ -793,6 +797,9 @@ const Index = () => {
         conversationId={shareTarget?.id ?? null}
         conversationTitle={shareTarget?.title}
       />
+
+      <VoiceCallDialog open={voiceCallOpen} onOpenChange={setVoiceCallOpen} />
+
 
 
       <main className="flex min-w-0 flex-1 flex-col">
