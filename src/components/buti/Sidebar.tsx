@@ -30,7 +30,9 @@ interface Props {
   open: boolean;
   onToggle: () => void;
   onOpenSettings: () => void;
+  onStartVoiceCall: () => void;
 }
+
 
 export const Sidebar = ({
   conversations,
