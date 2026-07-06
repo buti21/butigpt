@@ -108,45 +108,46 @@
                    radial-gradient(900px 500px at -10% 110%, hsl(280 90% 70% / 0.08), transparent 60%);
     --shadow-glow: 0 10px 40px -12px hsl(258 90% 66% / 0.30);
     --shadow-soft: 0 1px 0 hsl(0 0% 100% / 0.6) inset, 0 8px 24px -12px hsl(0 0% 0% / 0.15);
-  }
-
-  /* === Color theme overrides (applied via <html class="theme-*">) === */
-  .theme-violet {
-    --primary: 258 90% 66%;
-    --primary-glow: 268 95% 75%;
-    --ring: 258 90% 66%;
-    --gradient-primary: linear-gradient(135deg, hsl(258 90% 66%), hsl(280 90% 70%));
-    --shadow-glow: 0 10px 40px -12px hsl(258 90% 66% / 0.45);
-  }
-  .theme-ocean {
-    --primary: 200 92% 55%;
-    --primary-glow: 188 95% 60%;
-    --ring: 200 92% 55%;
-    --gradient-primary: linear-gradient(135deg, hsl(200 92% 55%), hsl(170 85% 50%));
-    --shadow-glow: 0 10px 40px -12px hsl(200 92% 55% / 0.45);
-  }
-  .theme-sunset {
-    --primary: 18 95% 60%;
-    --primary-glow: 340 90% 65%;
-    --ring: 18 95% 60%;
-    --gradient-primary: linear-gradient(135deg, hsl(18 95% 60%), hsl(340 90% 65%));
-    --shadow-glow: 0 10px 40px -12px hsl(18 95% 60% / 0.45);
-  }
-  .theme-forest {
-    --primary: 152 65% 45%;
-    --primary-glow: 132 70% 55%;
-    --ring: 152 65% 45%;
-    --gradient-primary: linear-gradient(135deg, hsl(152 65% 45%), hsl(132 70% 55%));
-    --shadow-glow: 0 10px 40px -12px hsl(152 65% 45% / 0.45);
-  }
-  .theme-mono {
-    --primary: 220 10% 75%;
-    --primary-glow: 220 10% 85%;
-    --ring: 220 10% 75%;
-    --gradient-primary: linear-gradient(135deg, hsl(220 10% 75%), hsl(220 10% 55%));
-    --shadow-glow: 0 10px 40px -12px hsl(220 10% 50% / 0.35);
-  }
 }
+
+/* === Color theme overrides (applied via <html class="theme-*">) ===
+   Kept OUTSIDE @layer base so Tailwind doesn't tree-shake the class rules. */
+.theme-violet {
+  --primary: 258 90% 66%;
+  --primary-glow: 268 95% 75%;
+  --ring: 258 90% 66%;
+  --gradient-primary: linear-gradient(135deg, hsl(258 90% 66%), hsl(280 90% 70%));
+  --shadow-glow: 0 10px 40px -12px hsl(258 90% 66% / 0.45);
+}
+.theme-ocean {
+  --primary: 200 92% 55%;
+  --primary-glow: 188 95% 60%;
+  --ring: 200 92% 55%;
+  --gradient-primary: linear-gradient(135deg, hsl(200 92% 55%), hsl(170 85% 50%));
+  --shadow-glow: 0 10px 40px -12px hsl(200 92% 55% / 0.45);
+}
+.theme-sunset {
+  --primary: 18 95% 60%;
+  --primary-glow: 340 90% 65%;
+  --ring: 18 95% 60%;
+  --gradient-primary: linear-gradient(135deg, hsl(18 95% 60%), hsl(340 90% 65%));
+  --shadow-glow: 0 10px 40px -12px hsl(18 95% 60% / 0.45);
+}
+.theme-forest {
+  --primary: 152 65% 45%;
+  --primary-glow: 132 70% 55%;
+  --ring: 152 65% 45%;
+  --gradient-primary: linear-gradient(135deg, hsl(152 65% 45%), hsl(132 70% 55%));
+  --shadow-glow: 0 10px 40px -12px hsl(152 65% 45% / 0.45);
+}
+.theme-mono {
+  --primary: 220 10% 75%;
+  --primary-glow: 220 10% 85%;
+  --ring: 220 10% 75%;
+  --gradient-primary: linear-gradient(135deg, hsl(220 10% 75%), hsl(220 10% 55%));
+  --shadow-glow: 0 10px 40px -12px hsl(220 10% 50% / 0.35);
+}
+
 
 
 @layer base {
