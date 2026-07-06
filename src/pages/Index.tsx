@@ -7,6 +7,8 @@ import { ButiLogo } from "@/components/buti/ButiLogo";
 import { UserMenu } from "@/components/buti/UserMenu";
 import { SettingsDialog } from "@/components/buti/SettingsDialog";
 import { ShareDialog } from "@/components/buti/ShareDialog";
+import { VoiceCallDialog } from "@/components/buti/VoiceCallDialog";
+
 import { useAuth } from "@/hooks/use-auth";
 import { useSettings } from "@/hooks/use-settings";
 import { supabase } from "@/integrations/supabase/client";
@@ -99,6 +101,8 @@ const Index = () => {
   const [isStreaming, setIsStreaming] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [voiceCallOpen, setVoiceCallOpen] = useState(false);
+
   const [shareTarget, setShareTarget] = useState<{ id: string; title: string } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
   const dragCounter = useRef(0);
@@ -777,6 +781,10 @@ const Index = () => {
         open={sidebarOpen}
         onToggle={() => setSidebarOpen((s) => !s)}
         onOpenSettings={() => setSettingsOpen(true)}
+        onStartVoiceCall={() => {
+          setVoiceCallOpen(true);
+          if (window.innerWidth < 768) setSidebarOpen(false);
+        }}
       />
 
       <SettingsDialog
@@ -793,6 +801,9 @@ const Index = () => {
         conversationId={shareTarget?.id ?? null}
         conversationTitle={shareTarget?.title}
       />
+
+      <VoiceCallDialog open={voiceCallOpen} onOpenChange={setVoiceCallOpen} />
+
 
 
       <main className="flex min-w-0 flex-1 flex-col">
