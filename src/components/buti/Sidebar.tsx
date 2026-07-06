@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Plus, MessageSquare, Trash2, PanelLeftClose, PanelLeft, AlertTriangle, Settings as SettingsIcon, Share2 } from "lucide-react";
+import { Plus, MessageSquare, Trash2, PanelLeftClose, PanelLeft, AlertTriangle, Settings as SettingsIcon, Share2, Phone } from "lucide-react";
 import { ButiLogo } from "./ButiLogo";
 import { Button } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
