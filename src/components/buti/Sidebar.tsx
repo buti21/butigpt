@@ -84,7 +84,7 @@ export const Sidebar = ({
           </Button>
         </div>
 
-        <div className="px-3">
+        <div className="px-3 space-y-2">
           <Button
             onClick={onNew}
             className="w-full justify-start gap-2 rounded-xl bg-gradient-primary text-primary-foreground shadow-glow hover:opacity-90 transition-all duration-200 hover:scale-[1.02]"
@@ -92,7 +92,16 @@ export const Sidebar = ({
             <Plus className="h-4 w-4" />
             Conversație nouă
           </Button>
+          <Button
+            onClick={onStartVoiceCall}
+            variant="outline"
+            className="w-full justify-start gap-2 rounded-xl border-primary/40 bg-primary/5 hover:bg-primary/10 hover:border-primary transition-all duration-200"
+          >
+            <Phone className="h-4 w-4 text-primary" />
+            Apel vocal
+          </Button>
         </div>
+
 
         <div className="mt-4 flex-1 overflow-y-auto scrollbar-thin px-2 pb-4">
           {conversations.length === 0 ? (
