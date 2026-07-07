@@ -9,7 +9,7 @@ let currentAudio: HTMLAudioElement | null = null;
 let currentSetter: ((v: boolean) => void) | null = null;
 
 export function useTTS() {
-  const { ttsSpeed } = useSettings();
+  const { ttsSpeed, ttsVoiceId } = useSettings();
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
@@ -55,7 +55,7 @@ export function useTTS() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${ANON_KEY}`,
           },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, voiceId: ttsVoiceId }),
         });
         if (!resp.ok) {
           throw new Error(`TTS failed: ${resp.status}`);
@@ -97,7 +97,7 @@ export function useTTS() {
         setIsLoading(false);
       }
     },
-    [isLoading, isPlaying, stop, ttsSpeed],
+    [isLoading, isPlaying, stop, ttsSpeed, ttsVoiceId],
   );
 
   useEffect(() => {
