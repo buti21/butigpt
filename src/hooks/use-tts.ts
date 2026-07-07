@@ -9,7 +9,7 @@ let currentAudio: HTMLAudioElement | null = null;
 let currentSetter: ((v: boolean) => void) | null = null;
 
 export function useTTS() {
-  const { ttsSpeed } = useSettings();
+  const { ttsSpeed, ttsVoiceId } = useSettings();
   const [isLoading, setIsLoading] = useState(false);
   const [isPlaying, setIsPlaying] = useState(false);
   const audioRef = useRef<HTMLAudioElement | null>(null);
