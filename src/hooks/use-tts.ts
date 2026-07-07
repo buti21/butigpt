@@ -97,7 +97,7 @@ export function useTTS() {
         setIsLoading(false);
       }
     },
-    [isLoading, isPlaying, stop, ttsSpeed],
+    [isLoading, isPlaying, stop, ttsSpeed, ttsVoiceId],
   );
 
   useEffect(() => {
