@@ -55,7 +55,7 @@ export function useTTS() {
             "Content-Type": "application/json",
             Authorization: `Bearer ${ANON_KEY}`,
           },
-          body: JSON.stringify({ text }),
+          body: JSON.stringify({ text, voiceId: ttsVoiceId }),
         });
         if (!resp.ok) {
           throw new Error(`TTS failed: ${resp.status}`);
