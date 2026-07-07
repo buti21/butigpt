@@ -13,6 +13,7 @@ interface Settings {
   typewriterSpeed: TypewriterSpeed;
   autoTts: boolean;
   ttsSpeed: number; // 0.75..1.5
+  ttsVoiceId: string;
   enterToSend: boolean;
   model: ModelChoice;
   saveHistory: boolean;
@@ -32,6 +33,7 @@ interface SettingsCtx extends Settings {
   setTypewriterSpeed: (s: TypewriterSpeed) => void;
   setAutoTts: (v: boolean) => void;
   setTtsSpeed: (v: number) => void;
+  setTtsVoiceId: (v: string) => void;
   setEnterToSend: (v: boolean) => void;
   setModel: (m: ModelChoice) => void;
   setSaveHistory: (v: boolean) => void;
@@ -53,6 +55,7 @@ const DEFAULTS: Settings = {
   typewriterSpeed: "normal",
   autoTts: false,
   ttsSpeed: 1,
+  ttsVoiceId: "EXAVITQu4vr4xnSDxMaL",
   enterToSend: true,
   model: "fast",
   saveHistory: true,
@@ -121,6 +124,7 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
         setTypewriterSpeed: (typewriterSpeed) => update({ typewriterSpeed }),
         setAutoTts: (autoTts) => update({ autoTts }),
         setTtsSpeed: (ttsSpeed) => update({ ttsSpeed }),
+        setTtsVoiceId: (ttsVoiceId) => update({ ttsVoiceId }),
         setEnterToSend: (enterToSend) => update({ enterToSend }),
         setModel: (model) => update({ model }),
         setSaveHistory: (saveHistory) => update({ saveHistory }),
