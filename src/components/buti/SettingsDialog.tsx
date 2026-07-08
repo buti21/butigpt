@@ -43,6 +43,10 @@ import {
   AlertTriangle,
   Sparkles,
   Video,
+  Play,
+  Square,
+  Loader2,
+  Check,
 } from "lucide-react";
 import {
   useSettings,
