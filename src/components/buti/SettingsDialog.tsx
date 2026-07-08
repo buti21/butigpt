@@ -449,3 +449,112 @@ const Row = ({ label, hint, children }: { label: string; hint?: string; children
     <div className="flex-shrink-0">{children}</div>
   </div>
 );
+
+const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tts`;
+const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
+
+const VoicePicker = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => {
+  const [playingId, setPlayingId] = useState<string | null>(null);
+  const [loadingId, setLoadingId] = useState<string | null>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
+  const cacheRef = useRef<Map<string, string>>(new Map());
+
+  const stop = () => {
+    if (audioRef.current) {
+      try { audioRef.current.pause(); } catch { /* ignore */ }
+      audioRef.current = null;
+    }
+    setPlayingId(null);
+  };
+
+  const preview = async (voice: { id: string; label: string }) => {
+    if (playingId === voice.id || loadingId === voice.id) {
+      stop();
+      return;
+    }
+    stop();
+    setLoadingId(voice.id);
+    try {
+      let dataUrl = cacheRef.current.get(voice.id);
+      if (!dataUrl) {
+        const resp = await fetch(TTS_URL, {
+          method: "POST",
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
+          body: JSON.stringify({ text: `Salut, eu sunt ${voice.label}.`, voiceId: voice.id }),
+        });
+        if (!resp.ok) throw new Error("preview failed");
+        const data = await resp.json();
+        if (!data?.audioContent) throw new Error("no audio");
+        dataUrl = `data:audio/mpeg;base64,${data.audioContent}`;
+        cacheRef.current.set(voice.id, dataUrl);
+      }
+      const audio = new Audio(dataUrl);
+      audioRef.current = audio;
+      audio.onended = () => { if (audioRef.current === audio) { audioRef.current = null; setPlayingId(null); } };
+      audio.onerror = () => { if (audioRef.current === audio) { audioRef.current = null; setPlayingId(null); } };
+      await audio.play();
+      setPlayingId(voice.id);
+    } catch (e) {
+      console.error(e);
+      toast({ title: "Nu am putut reda mostra", description: "Reîncearcă în câteva secunde.", variant: "destructive" });
+    } finally {
+      setLoadingId(null);
+    }
+  };
+
+  const renderRow = (v: typeof TTS_VOICES[number]) => {
+    const selected = value === v.id;
+    const isPlaying = playingId === v.id;
+    const isLoading = loadingId === v.id;
+    return (
+      <div
+        key={v.id}
+        className={cn(
+          "flex items-center gap-2 rounded-lg border p-2 transition-colors",
+          selected ? "border-primary bg-primary/5" : "border-border hover:bg-secondary/40"
+        )}
+      >
+        <button
+          type="button"
+          onClick={(e) => { e.stopPropagation(); preview(v); }}
+          className={cn(
+            "flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-border bg-surface-2 text-foreground hover:bg-primary hover:text-primary-foreground hover:border-primary transition-colors",
+            isPlaying && "bg-primary text-primary-foreground border-primary"
+          )}
+          aria-label={`Previzualizează vocea ${v.label}`}
+        >
+          {isLoading ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : isPlaying ? <Square className="h-3 w-3 fill-current" /> : <Play className="h-3.5 w-3.5 fill-current" />}
+        </button>
+        <button
+          type="button"
+          onClick={() => onChange(v.id)}
+          className="flex-1 min-w-0 text-left"
+        >
+          <div className="flex items-center gap-1.5">
+            <span className="text-sm font-medium truncate">{v.label}</span>
+            {selected && <Check className="h-3.5 w-3.5 text-primary flex-shrink-0" />}
+          </div>
+          <div className="text-[11px] text-muted-foreground truncate">{v.description}</div>
+        </button>
+      </div>
+    );
+  };
+
+  useEffect(() => () => stop(), []);
+
+  const females = TTS_VOICES.filter((v) => v.gender === "female");
+  const males = TTS_VOICES.filter((v) => v.gender === "male");
+
+  return (
+    <div className="rounded-xl border border-border bg-surface-2/40 p-3 space-y-3 max-h-[420px] overflow-y-auto scrollbar-thin">
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 px-1">Femei</div>
+        <div className="grid gap-1.5">{females.map(renderRow)}</div>
+      </div>
+      <div>
+        <div className="text-[10px] uppercase tracking-wider text-muted-foreground mb-1.5 px-1">Bărbați</div>
+        <div className="grid gap-1.5">{males.map(renderRow)}</div>
+      </div>
+    </div>
+  );
+};
