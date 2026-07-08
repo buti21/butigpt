@@ -278,27 +278,9 @@ export const SettingsDialog = ({
                 <div>
                   <Label className="text-sm">Voce</Label>
                   <p className="text-xs text-muted-foreground mt-0.5 mb-2">
-                    Folosită la citirea răspunsurilor și în apelul vocal.
+                    Folosită la citirea răspunsurilor și în apelul vocal. Apasă ▶ pentru a asculta o mostră.
                   </p>
-                  <Select value={s.ttsVoiceId} onValueChange={s.setTtsVoiceId}>
-                    <SelectTrigger className="w-full"><SelectValue /></SelectTrigger>
-                    <SelectContent className="max-h-80">
-                      <div className="px-2 py-1 text-[10px] uppercase tracking-wider text-muted-foreground">Femei</div>
-                      {TTS_VOICES.filter((v) => v.gender === "female").map((v) => (
-                        <SelectItem key={v.id} value={v.id}>
-                          <span className="font-medium">{v.label}</span>
-                          <span className="text-muted-foreground ml-2 text-xs">— {v.description}</span>
-                        </SelectItem>
-                      ))}
-                      <div className="px-2 py-1 mt-1 text-[10px] uppercase tracking-wider text-muted-foreground">Bărbați</div>
-                      {TTS_VOICES.filter((v) => v.gender === "male").map((v) => (
-                        <SelectItem key={v.id} value={v.id}>
-                          <span className="font-medium">{v.label}</span>
-                          <span className="text-muted-foreground ml-2 text-xs">— {v.description}</span>
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <VoicePicker value={s.ttsVoiceId} onChange={s.setTtsVoiceId} />
                 </div>
                 <div>
                   <div className="flex items-center justify-between mb-2">
