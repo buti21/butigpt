@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, PhoneOff, Loader2, Volume2, User } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Loader2, Volume2, User, FileText } from "lucide-react";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useSettings } from "@/hooks/use-settings";
 import { toast } from "@/hooks/use-toast";
