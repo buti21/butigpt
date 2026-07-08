@@ -190,6 +190,10 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
 
       setState("speaking");
       await speak(cleanText);
+      // Cooldown scurt după ce termină vocea — să nu se prindă ecoul TTS-ului
+      cooldownUntilRef.current = Date.now() + 700;
+      finalBufferRef.current = "";
+      setTranscript("");
       setState("listening");
     },
     [s.model, s.aboutYou, s.customInstructions, speak],
@@ -199,18 +203,31 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
     lang,
     onResult: (text, isFinal) => {
       if (!text) return;
+      // Ignoră ORICE input când nu ascultăm activ sau când e cooldown activ
+      if (stateRef.current !== "listening") return;
+      if (Date.now() < cooldownUntilRef.current) return;
+
       if (isFinal) {
-        finalBufferRef.current += (finalBufferRef.current ? " " : "") + text;
-        setTranscript(finalBufferRef.current);
+        // Dedup: dacă browserul re-emite exact aceeași frază, ignoră-o
+        const clean = text.trim();
+        if (!clean) return;
+        const combined = (finalBufferRef.current + " " + clean).trim();
+        finalBufferRef.current = combined;
+        setTranscript(combined);
         if (silenceTimerRef.current) window.clearTimeout(silenceTimerRef.current);
         silenceTimerRef.current = window.setTimeout(() => {
           const t = finalBufferRef.current.trim();
           finalBufferRef.current = "";
           setTranscript("");
-          if (t) askAndSpeak(t);
+          // Nu re-trimite aceeași frază de două ori consecutiv
+          if (t && t !== lastSubmittedRef.current) {
+            lastSubmittedRef.current = t;
+            askAndSpeak(t);
+          }
         }, 900);
       } else {
-        setTranscript(finalBufferRef.current + (finalBufferRef.current ? " " : "") + text);
+        const shown = (finalBufferRef.current + " " + text).trim();
+        setTranscript(shown);
       }
     },
   });
@@ -223,6 +240,8 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
     }
     if (state === "speaking" || state === "thinking") {
       if (isListening) stop();
+      finalBufferRef.current = "";
+      setTranscript("");
     }
   }, [state, open, muted, isListening, start, stop]);
 
