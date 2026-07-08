@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
-import { Mic, MicOff, PhoneOff, Loader2, Volume2, User } from "lucide-react";
+import { Mic, MicOff, PhoneOff, Loader2, Volume2, User, FileText } from "lucide-react";
 import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
 import { useSettings } from "@/hooks/use-settings";
 import { toast } from "@/hooks/use-toast";
@@ -47,11 +47,17 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
   const [lastUser, setLastUser] = useState("");
   const [muted, setMuted] = useState(false);
   const [usingFallbackTts, setUsingFallbackTts] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(true);
   const historyRef = useRef<{ role: "user" | "assistant"; content: string }[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const silenceTimerRef = useRef<number | null>(null);
   const finalBufferRef = useRef("");
   const fallbackRef = useRef(false);
+  const stateRef = useRef<CallState>("idle");
+  const cooldownUntilRef = useRef(0);
+  const lastSubmittedRef = useRef<string>("");
+
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   const lang =
     s.language === "en" ? "en-US" :
@@ -184,6 +190,10 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
 
       setState("speaking");
       await speak(cleanText);
+      // Cooldown scurt după ce termină vocea — să nu se prindă ecoul TTS-ului
+      cooldownUntilRef.current = Date.now() + 700;
+      finalBufferRef.current = "";
+      setTranscript("");
       setState("listening");
     },
     [s.model, s.aboutYou, s.customInstructions, speak],
@@ -193,18 +203,31 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
     lang,
     onResult: (text, isFinal) => {
       if (!text) return;
+      // Ignoră ORICE input când nu ascultăm activ sau când e cooldown activ
+      if (stateRef.current !== "listening") return;
+      if (Date.now() < cooldownUntilRef.current) return;
+
       if (isFinal) {
-        finalBufferRef.current += (finalBufferRef.current ? " " : "") + text;
-        setTranscript(finalBufferRef.current);
+        // Dedup: dacă browserul re-emite exact aceeași frază, ignoră-o
+        const clean = text.trim();
+        if (!clean) return;
+        const combined = (finalBufferRef.current + " " + clean).trim();
+        finalBufferRef.current = combined;
+        setTranscript(combined);
         if (silenceTimerRef.current) window.clearTimeout(silenceTimerRef.current);
         silenceTimerRef.current = window.setTimeout(() => {
           const t = finalBufferRef.current.trim();
           finalBufferRef.current = "";
           setTranscript("");
-          if (t) askAndSpeak(t);
+          // Nu re-trimite aceeași frază de două ori consecutiv
+          if (t && t !== lastSubmittedRef.current) {
+            lastSubmittedRef.current = t;
+            askAndSpeak(t);
+          }
         }, 900);
       } else {
-        setTranscript(finalBufferRef.current + (finalBufferRef.current ? " " : "") + text);
+        const shown = (finalBufferRef.current + " " + text).trim();
+        setTranscript(shown);
       }
     },
   });
@@ -217,6 +240,8 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
     }
     if (state === "speaking" || state === "thinking") {
       if (isListening) stop();
+      finalBufferRef.current = "";
+      setTranscript("");
     }
   }, [state, open, muted, isListening, start, stop]);
 
@@ -276,45 +301,52 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
             )}
           </div>
 
-          {/* Transcript LIVE — mereu vizibil */}
-          <div className="w-full max-w-sm space-y-2">
-            {lastUser && (
-              <div className="rounded-xl border border-border bg-surface-2/60 p-3 text-sm">
-                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                  <User className="h-3 w-3" /> Tu
+          {/* Transcript LIVE — se poate ascunde */}
+          {showTranscript && (
+            <div className="w-full max-w-sm space-y-2">
+              {lastUser && (
+                <div className="rounded-xl border border-border bg-surface-2/60 p-3 text-sm">
+                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                    <User className="h-3 w-3" /> Tu
+                  </div>
+                  <p className="leading-relaxed">{lastUser}</p>
                 </div>
-                <p className="leading-relaxed">{lastUser}</p>
-              </div>
-            )}
+              )}
 
-            <div className="rounded-xl border border-border bg-surface-2 p-3 text-sm min-h-[80px]">
-              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                <Volume2 className="h-3 w-3" /> ButiGPT
-              </div>
-              {state === "thinking" && !reply && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Se gândește…
+              <div className="rounded-xl border border-border bg-surface-2 p-3 text-sm min-h-[80px]">
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                  <Volume2 className="h-3 w-3" /> ButiGPT
                 </div>
-              )}
-              {(state === "speaking" || (state === "thinking" && reply)) && (
-                <p className="leading-relaxed">{reply || "…"}</p>
-              )}
-              {state === "listening" && (
-                <p className={cn("leading-relaxed", !transcript && "italic text-muted-foreground")}>
-                  {transcript || (reply ? reply : "Spune ceva…")}
-                </p>
+                {state === "thinking" && !reply && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Se gândește…
+                  </div>
+                )}
+                {(state === "speaking" || (state === "thinking" && reply)) && (
+                  <p className="leading-relaxed">{reply || "…"}</p>
+                )}
+                {state === "listening" && (
+                  <p className={cn("leading-relaxed", !transcript && "italic text-muted-foreground")}>
+                    {transcript || (reply ? reply : "Spune ceva…")}
+                  </p>
+                )}
+              </div>
+
+              {!isSupported && (
+                <div className="text-xs text-destructive text-center">
+                  Browserul tău nu suportă recunoașterea vocală. Încearcă Chrome sau Safari iOS.
+                </div>
               )}
             </div>
-
-            {!isSupported && (
-              <div className="text-xs text-destructive text-center">
-                Browserul tău nu suportă recunoașterea vocală. Încearcă Chrome sau Safari iOS.
-              </div>
-            )}
-          </div>
+          )}
+          {state === "speaking" && (
+            <div className="text-[11px] text-muted-foreground italic">
+              🔇 Microfonul e pauzat cât timp vorbesc
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center justify-center gap-6 px-6 py-6 border-t border-border bg-surface-1">
+        <div className="flex items-center justify-center gap-4 px-6 py-6 border-t border-border bg-surface-1">
           <Button
             variant="outline"
             size="icon"
@@ -323,6 +355,16 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
             aria-label={muted ? "Reactivează microfonul" : "Oprește microfonul"}
           >
             {muted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setShowTranscript((v) => !v)}
+            className={cn("h-14 w-14 rounded-full", !showTranscript && "bg-secondary/60")}
+            aria-label={showTranscript ? "Ascunde transcrierea" : "Arată transcrierea"}
+            title={showTranscript ? "Ascunde transcrierea" : "Arată transcrierea"}
+          >
+            <FileText className="h-6 w-6" />
           </Button>
           <Button
             onClick={endCall}
