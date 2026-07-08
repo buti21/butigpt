@@ -301,45 +301,52 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
             )}
           </div>
 
-          {/* Transcript LIVE — mereu vizibil */}
-          <div className="w-full max-w-sm space-y-2">
-            {lastUser && (
-              <div className="rounded-xl border border-border bg-surface-2/60 p-3 text-sm">
-                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                  <User className="h-3 w-3" /> Tu
+          {/* Transcript LIVE — se poate ascunde */}
+          {showTranscript && (
+            <div className="w-full max-w-sm space-y-2">
+              {lastUser && (
+                <div className="rounded-xl border border-border bg-surface-2/60 p-3 text-sm">
+                  <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                    <User className="h-3 w-3" /> Tu
+                  </div>
+                  <p className="leading-relaxed">{lastUser}</p>
                 </div>
-                <p className="leading-relaxed">{lastUser}</p>
-              </div>
-            )}
+              )}
 
-            <div className="rounded-xl border border-border bg-surface-2 p-3 text-sm min-h-[80px]">
-              <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
-                <Volume2 className="h-3 w-3" /> ButiGPT
-              </div>
-              {state === "thinking" && !reply && (
-                <div className="flex items-center gap-2 text-muted-foreground">
-                  <Loader2 className="h-4 w-4 animate-spin" /> Se gândește…
+              <div className="rounded-xl border border-border bg-surface-2 p-3 text-sm min-h-[80px]">
+                <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-muted-foreground mb-1">
+                  <Volume2 className="h-3 w-3" /> ButiGPT
                 </div>
-              )}
-              {(state === "speaking" || (state === "thinking" && reply)) && (
-                <p className="leading-relaxed">{reply || "…"}</p>
-              )}
-              {state === "listening" && (
-                <p className={cn("leading-relaxed", !transcript && "italic text-muted-foreground")}>
-                  {transcript || (reply ? reply : "Spune ceva…")}
-                </p>
+                {state === "thinking" && !reply && (
+                  <div className="flex items-center gap-2 text-muted-foreground">
+                    <Loader2 className="h-4 w-4 animate-spin" /> Se gândește…
+                  </div>
+                )}
+                {(state === "speaking" || (state === "thinking" && reply)) && (
+                  <p className="leading-relaxed">{reply || "…"}</p>
+                )}
+                {state === "listening" && (
+                  <p className={cn("leading-relaxed", !transcript && "italic text-muted-foreground")}>
+                    {transcript || (reply ? reply : "Spune ceva…")}
+                  </p>
+                )}
+              </div>
+
+              {!isSupported && (
+                <div className="text-xs text-destructive text-center">
+                  Browserul tău nu suportă recunoașterea vocală. Încearcă Chrome sau Safari iOS.
+                </div>
               )}
             </div>
-
-            {!isSupported && (
-              <div className="text-xs text-destructive text-center">
-                Browserul tău nu suportă recunoașterea vocală. Încearcă Chrome sau Safari iOS.
-              </div>
-            )}
-          </div>
+          )}
+          {state === "speaking" && (
+            <div className="text-[11px] text-muted-foreground italic">
+              🔇 Microfonul e pauzat cât timp vorbesc
+            </div>
+          )}
         </div>
 
-        <div className="flex items-center justify-center gap-6 px-6 py-6 border-t border-border bg-surface-1">
+        <div className="flex items-center justify-center gap-4 px-6 py-6 border-t border-border bg-surface-1">
           <Button
             variant="outline"
             size="icon"
@@ -348,6 +355,16 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
             aria-label={muted ? "Reactivează microfonul" : "Oprește microfonul"}
           >
             {muted ? <MicOff className="h-6 w-6" /> : <Mic className="h-6 w-6" />}
+          </Button>
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => setShowTranscript((v) => !v)}
+            className={cn("h-14 w-14 rounded-full", !showTranscript && "bg-secondary/60")}
+            aria-label={showTranscript ? "Ascunde transcrierea" : "Arată transcrierea"}
+            title={showTranscript ? "Ascunde transcrierea" : "Arată transcrierea"}
+          >
+            <FileText className="h-6 w-6" />
           </Button>
           <Button
             onClick={endCall}
