@@ -222,6 +222,25 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
     if (files.length) {
       e.preventDefault();
       await addFiles(files);
+      return;
+    }
+    // Text lung lipit → convertit în atașament „Text lipit"
+    const pasted = e.clipboardData?.getData("text") ?? "";
+    if (pasted.length >= 500) {
+      e.preventDefault();
+      setFiles((prev) => [
+        ...prev,
+        {
+          id: uid(),
+          parsed: {
+            name: "Text lipit",
+            size: pasted.length,
+            text: pasted,
+            truncated: false,
+            kind: "Text",
+          },
+        },
+      ]);
     }
   };
 
