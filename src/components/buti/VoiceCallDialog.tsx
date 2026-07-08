@@ -47,11 +47,17 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
   const [lastUser, setLastUser] = useState("");
   const [muted, setMuted] = useState(false);
   const [usingFallbackTts, setUsingFallbackTts] = useState(false);
+  const [showTranscript, setShowTranscript] = useState(true);
   const historyRef = useRef<{ role: "user" | "assistant"; content: string }[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
   const silenceTimerRef = useRef<number | null>(null);
   const finalBufferRef = useRef("");
   const fallbackRef = useRef(false);
+  const stateRef = useRef<CallState>("idle");
+  const cooldownUntilRef = useRef(0);
+  const lastSubmittedRef = useRef<string>("");
+
+  useEffect(() => { stateRef.current = state; }, [state]);
 
   const lang =
     s.language === "en" ? "en-US" :
