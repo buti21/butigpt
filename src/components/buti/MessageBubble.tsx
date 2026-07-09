@@ -5,12 +5,13 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { ButiLogo } from "./ButiLogo";
-import { User, Copy, Check, Volume2, Loader2, Square, Download } from "lucide-react";
+import { User, Copy, Check, Volume2, Loader2, Square, Download, Play, Video as VideoIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTTS } from "@/hooks/use-tts";
 import { useSettings } from "@/hooks/use-settings";
 import { toast } from "@/hooks/use-toast";
 import { ImageLightbox } from "./ImageLightbox";
+import { VideoPlayer } from "./VideoPlayer";
 import {
   buildPresentation,
   downloadBlob,
@@ -26,6 +27,7 @@ export interface ChatMessage {
   content: string;
   images?: string[];
   presentation?: PresentationSpec;
+  video?: { url: string; prompt?: string };
   createdAt?: number;
 }
 
