@@ -9,6 +9,7 @@ import {
   Mic,
   FileText,
   Loader2,
+  Youtube,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
