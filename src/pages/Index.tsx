@@ -409,6 +409,68 @@ const Index = () => {
     }
   };
 
+  const generateVideo = async (prompt: string, quality: "fast" | "quality") => {
+    let convId = activeId;
+    if (!convId) convId = newConversation();
+
+    const userMsg: ChatMessage = {
+      id: uid(),
+      role: "user",
+      content: `🎬 Generează video: ${prompt}`,
+      createdAt: Date.now(),
+    };
+    const assistantId = uid();
+    updateConv(convId, (c) => ({
+      ...c,
+      title: c.messages.length === 0 ? prompt.slice(0, 40) : c.title,
+      updatedAt: Date.now(),
+      messages: [
+        ...c.messages,
+        userMsg,
+        { id: assistantId, role: "assistant", content: "🎥 Se generează videoclipul… (poate dura până la 90s)", createdAt: Date.now() },
+      ],
+    }));
+    stickToBottomRef.current = true;
+    setVideoGenerating(true);
+    try {
+      const resp = await fetch(VIDEO_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON_KEY}` },
+        body: JSON.stringify({ prompt, quality }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data?.videoUrl) {
+        throw new Error(data?.error || `HTTP ${resp.status}`);
+      }
+      updateConv(convId!, (c) => ({
+        ...c,
+        updatedAt: Date.now(),
+        messages: c.messages.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: "Iată videoclipul generat:", video: { url: data.videoUrl, prompt } }
+            : m,
+        ),
+      }));
+    } catch (e) {
+      console.error("video gen failed:", e);
+      updateConv(convId!, (c) => ({
+        ...c,
+        messages: c.messages.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: `❌ Nu am putut genera videoclipul: ${e instanceof Error ? e.message : "eroare"}` }
+            : m,
+        ),
+      }));
+      toast({
+        title: "Generare eșuată",
+        description: e instanceof Error ? e.message : "Reîncearcă în câteva secunde.",
+        variant: "destructive",
+      });
+    } finally {
+      setVideoGenerating(false);
+    }
+  };
+
   const send = async (text: string, attachments: AttachedImage[] = [], docFiles: AttachedFile[] = []) => {
     let convId = activeId;
     if (!convId) convId = newConversation();
