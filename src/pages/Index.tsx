@@ -19,6 +19,7 @@ import { ImagePlus } from "lucide-react";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const TITLE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/title`;
+const VIDEO_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-video`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
 // Typewriter pacing — natural variable-speed typing
