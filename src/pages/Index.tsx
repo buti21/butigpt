@@ -930,7 +930,6 @@ const Index = () => {
           enterToSend={enterToSend}
           onOpenVideoGen={() => setVideoGenOpen(true)}
         />
-        />
       </main>
     </div>
   );
