@@ -8,6 +8,7 @@ import { UserMenu } from "@/components/buti/UserMenu";
 import { SettingsDialog } from "@/components/buti/SettingsDialog";
 import { ShareDialog } from "@/components/buti/ShareDialog";
 import { VoiceCallDialog } from "@/components/buti/VoiceCallDialog";
+import { VideoGenDialog } from "@/components/buti/VideoGenDialog";
 
 import { useAuth } from "@/hooks/use-auth";
 import { useSettings } from "@/hooks/use-settings";
@@ -18,6 +19,7 @@ import { ImagePlus } from "lucide-react";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const TITLE_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/title`;
+const VIDEO_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/generate-video`;
 const ANON_KEY = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
 // Typewriter pacing — natural variable-speed typing
@@ -102,6 +104,8 @@ const Index = () => {
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [voiceCallOpen, setVoiceCallOpen] = useState(false);
+  const [videoGenOpen, setVideoGenOpen] = useState(false);
+  const [videoGenerating, setVideoGenerating] = useState(false);
 
   const [shareTarget, setShareTarget] = useState<{ id: string; title: string } | null>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -402,6 +406,68 @@ const Index = () => {
       }
     } catch {
       /* ignore */
+    }
+  };
+
+  const generateVideo = async (prompt: string, quality: "fast" | "quality") => {
+    let convId = activeId;
+    if (!convId) convId = newConversation();
+
+    const userMsg: ChatMessage = {
+      id: uid(),
+      role: "user",
+      content: `🎬 Generează video: ${prompt}`,
+      createdAt: Date.now(),
+    };
+    const assistantId = uid();
+    updateConv(convId, (c) => ({
+      ...c,
+      title: c.messages.length === 0 ? prompt.slice(0, 40) : c.title,
+      updatedAt: Date.now(),
+      messages: [
+        ...c.messages,
+        userMsg,
+        { id: assistantId, role: "assistant", content: "🎥 Se generează videoclipul… (poate dura până la 90s)", createdAt: Date.now() },
+      ],
+    }));
+    stickToBottomRef.current = true;
+    setVideoGenerating(true);
+    try {
+      const resp = await fetch(VIDEO_URL, {
+        method: "POST",
+        headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON_KEY}` },
+        body: JSON.stringify({ prompt, quality }),
+      });
+      const data = await resp.json();
+      if (!resp.ok || !data?.videoUrl) {
+        throw new Error(data?.error || `HTTP ${resp.status}`);
+      }
+      updateConv(convId!, (c) => ({
+        ...c,
+        updatedAt: Date.now(),
+        messages: c.messages.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: "Iată videoclipul generat:", video: { url: data.videoUrl, prompt } }
+            : m,
+        ),
+      }));
+    } catch (e) {
+      console.error("video gen failed:", e);
+      updateConv(convId!, (c) => ({
+        ...c,
+        messages: c.messages.map((m) =>
+          m.id === assistantId
+            ? { ...m, content: `❌ Nu am putut genera videoclipul: ${e instanceof Error ? e.message : "eroare"}` }
+            : m,
+        ),
+      }));
+      toast({
+        title: "Generare eșuată",
+        description: e instanceof Error ? e.message : "Reîncearcă în câteva secunde.",
+        variant: "destructive",
+      });
+    } finally {
+      setVideoGenerating(false);
     }
   };
 
@@ -804,6 +870,13 @@ const Index = () => {
 
       <VoiceCallDialog open={voiceCallOpen} onOpenChange={setVoiceCallOpen} />
 
+      <VideoGenDialog
+        open={videoGenOpen}
+        onOpenChange={setVideoGenOpen}
+        onGenerate={generateVideo}
+        isGenerating={videoGenerating}
+      />
+
 
 
       <main className="flex min-w-0 flex-1 flex-col">
@@ -855,6 +928,7 @@ const Index = () => {
           externalImages={pendingDropImages}
           onConsumeExternal={() => setPendingDropImages([])}
           enterToSend={enterToSend}
+          onOpenVideoGen={() => setVideoGenOpen(true)}
         />
       </main>
     </div>

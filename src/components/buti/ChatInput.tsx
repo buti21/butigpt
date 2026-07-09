@@ -9,6 +9,7 @@ import {
   Mic,
   FileText,
   Loader2,
+  Youtube,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import {
@@ -42,6 +43,7 @@ interface Props {
   externalImages?: AttachedImage[];
   onConsumeExternal?: () => void;
   enterToSend?: boolean;
+  onOpenVideoGen?: () => void;
 }
 
 const MAX_IMAGE_BYTES = 8 * 1024 * 1024; // 8MB per image safeguard
@@ -57,7 +59,7 @@ const fileToDataUrl = (file: File): Promise<string> =>
 
 const uid = () => Math.random().toString(36).slice(2, 10);
 
-export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImages, onConsumeExternal, enterToSend = true }: Props) => {
+export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImages, onConsumeExternal, enterToSend = true, onOpenVideoGen }: Props) => {
   const [value, setValue] = useState("");
   const [images, setImages] = useState<AttachedImage[]>([]);
   const [files, setFiles] = useState<AttachedFile[]>([]);
@@ -358,6 +360,21 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
             >
               <Mic className="h-4 w-4" />
             </Button>
+
+            {onOpenVideoGen && (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={onOpenVideoGen}
+                disabled={disabled}
+                className="h-9 w-9 flex-shrink-0 rounded-xl text-muted-foreground hover:bg-red-500/15 hover:text-red-500"
+                aria-label="Generează video"
+                title="Generează video AI"
+              >
+                <Youtube className="h-4 w-4" />
+              </Button>
+            )}
 
             <input
               ref={fileInputRef}

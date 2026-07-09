@@ -5,12 +5,13 @@ import remarkMath from "remark-math";
 import rehypeKatex from "rehype-katex";
 import "katex/dist/katex.min.css";
 import { ButiLogo } from "./ButiLogo";
-import { User, Copy, Check, Volume2, Loader2, Square, Download } from "lucide-react";
+import { User, Copy, Check, Volume2, Loader2, Square, Download, Play, Video as VideoIcon } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useTTS } from "@/hooks/use-tts";
 import { useSettings } from "@/hooks/use-settings";
 import { toast } from "@/hooks/use-toast";
 import { ImageLightbox } from "./ImageLightbox";
+import { VideoPlayer } from "./VideoPlayer";
 import {
   buildPresentation,
   downloadBlob,
@@ -26,6 +27,7 @@ export interface ChatMessage {
   content: string;
   images?: string[];
   presentation?: PresentationSpec;
+  video?: { url: string; prompt?: string };
   createdAt?: number;
 }
 
@@ -46,6 +48,7 @@ export const MessageBubble = ({ message, streaming }: Props) => {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const { isLoading: ttsLoading, isPlaying, play, stop } = useTTS();
   const { compactMode, showTimestamps, autoTts } = useSettings();
   const autoPlayedRef = useRef(false);
@@ -168,6 +171,9 @@ export const MessageBubble = ({ message, streaming }: Props) => {
               {message.presentation && !streaming && (
                 <PresentationCard spec={message.presentation} />
               )}
+              {message.video && !streaming && (
+                <VideoCard video={message.video} onOpen={() => setVideoSrc(message.video!.url)} />
+              )}
             </div>
           )}
 
@@ -213,9 +219,39 @@ export const MessageBubble = ({ message, streaming }: Props) => {
         </div>
       </div>
       <ImageLightbox src={lightboxSrc} onClose={() => setLightboxSrc(null)} />
+      <VideoPlayer src={videoSrc} onClose={() => setVideoSrc(null)} title={message.video?.prompt} />
     </div>
   );
 };
+
+const VideoCard = ({ video, onOpen }: { video: { url: string; prompt?: string }; onOpen: () => void }) => (
+  <button
+    type="button"
+    onClick={onOpen}
+    className="group relative block overflow-hidden rounded-xl border border-border bg-black shadow-soft transition-transform hover:scale-[1.01] max-w-md w-full"
+  >
+    <video
+      src={video.url}
+      className="w-full max-h-80 object-cover pointer-events-none"
+      muted
+      playsInline
+      preload="metadata"
+    />
+    <div className="absolute inset-0 flex items-center justify-center bg-black/30 group-hover:bg-black/40 transition-colors">
+      <div className="h-14 w-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
+        <Play className="h-6 w-6 text-black fill-current translate-x-0.5" />
+      </div>
+    </div>
+    <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent p-2.5 text-left">
+      <div className="flex items-center gap-1.5 text-[10px] uppercase tracking-wider text-white/70">
+        <VideoIcon className="h-3 w-3" /> Video AI
+      </div>
+      {video.prompt && (
+        <div className="text-xs text-white truncate mt-0.5">{video.prompt}</div>
+      )}
+    </div>
+  </button>
+);
 
 const ThinkingIndicator = () => {
   const [dots, setDots] = useState(1);
