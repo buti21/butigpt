@@ -8,6 +8,7 @@ import { UserMenu } from "@/components/buti/UserMenu";
 import { SettingsDialog } from "@/components/buti/SettingsDialog";
 import { ShareDialog } from "@/components/buti/ShareDialog";
 import { VoiceCallDialog } from "@/components/buti/VoiceCallDialog";
+import { VideoGenDialog } from "@/components/buti/VideoGenDialog";
 
 import { useAuth } from "@/hooks/use-auth";
 import { useSettings } from "@/hooks/use-settings";
