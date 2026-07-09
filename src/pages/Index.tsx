@@ -870,6 +870,13 @@ const Index = () => {
 
       <VoiceCallDialog open={voiceCallOpen} onOpenChange={setVoiceCallOpen} />
 
+      <VideoGenDialog
+        open={videoGenOpen}
+        onOpenChange={setVideoGenOpen}
+        onGenerate={generateVideo}
+        isGenerating={videoGenerating}
+      />
+
 
 
       <main className="flex min-w-0 flex-1 flex-col">
