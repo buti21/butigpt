@@ -928,6 +928,8 @@ const Index = () => {
           externalImages={pendingDropImages}
           onConsumeExternal={() => setPendingDropImages([])}
           enterToSend={enterToSend}
+          onOpenVideoGen={() => setVideoGenOpen(true)}
+        />
         />
       </main>
     </div>
