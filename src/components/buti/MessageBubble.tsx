@@ -48,6 +48,7 @@ export const MessageBubble = ({ message, streaming }: Props) => {
   const isUser = message.role === "user";
   const [copied, setCopied] = useState(false);
   const [lightboxSrc, setLightboxSrc] = useState<string | null>(null);
+  const [videoSrc, setVideoSrc] = useState<string | null>(null);
   const { isLoading: ttsLoading, isPlaying, play, stop } = useTTS();
   const { compactMode, showTimestamps, autoTts } = useSettings();
   const autoPlayedRef = useRef(false);
