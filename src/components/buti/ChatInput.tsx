@@ -361,6 +361,21 @@ export const ChatInput = ({ onSend, onStop, isStreaming, disabled, externalImage
               <Mic className="h-4 w-4" />
             </Button>
 
+            {onOpenVideoGen && (
+              <Button
+                type="button"
+                size="icon"
+                variant="ghost"
+                onClick={onOpenVideoGen}
+                disabled={disabled}
+                className="h-9 w-9 flex-shrink-0 rounded-xl text-muted-foreground hover:bg-red-500/15 hover:text-red-500"
+                aria-label="Generează video"
+                title="Generează video AI"
+              >
+                <Youtube className="h-4 w-4" />
+              </Button>
+            )}
+
             <input
               ref={fileInputRef}
               type="file"
