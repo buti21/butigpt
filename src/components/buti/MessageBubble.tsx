@@ -171,6 +171,9 @@ export const MessageBubble = ({ message, streaming }: Props) => {
               {message.presentation && !streaming && (
                 <PresentationCard spec={message.presentation} />
               )}
+              {message.video && !streaming && (
+                <VideoCard video={message.video} onOpen={() => setVideoSrc(message.video!.url)} />
+              )}
             </div>
           )}
 
