@@ -67,24 +67,52 @@ serve(async (req) => {
 
     const MODEL_MAP: Record<string, string> = {
       fast: "google/gemini-3-flash-preview",
-      smart: "google/gemini-2.5-pro",
       lite: "google/gemini-3.1-flash-lite-preview",
     };
-    const model = MODEL_MAP[modelChoice as string] ?? MODEL_MAP.fast;
+
+    // "smart" (Pro) rulează pe DeepSeek (API propriu, compatibil OpenAI)
+    const useDeepSeek = modelChoice === "smart" && !!DEEPSEEK_API_KEY;
+    const model = useDeepSeek
+      ? "deepseek-chat"
+      : MODEL_MAP[modelChoice as string] ?? MODEL_MAP.fast;
 
     const fullSystem = typeof systemExtras === "string" && systemExtras.trim()
       ? `${SYSTEM_PROMPT}\n\n---\nPREFERINȚE UTILIZATOR (respectă-le strict):\n${systemExtras.trim()}`
       : SYSTEM_PROMPT;
 
-    const upstream = await fetch(GATEWAY_URL, {
+    // DeepSeek e text-only: transformă părțile de imagine în text
+    const outMessages = useDeepSeek
+      ? (messages as Array<{ role: string; content: unknown }>).map((m) => {
+          if (Array.isArray(m.content)) {
+            const text = (m.content as Array<{ type: string; text?: string }>)
+              .filter((p) => p.type === "text")
+              .map((p) => p.text ?? "")
+              .join("\n");
+            const hadImage = (m.content as Array<{ type: string }>).some(
+              (p) => p.type === "image_url",
+            );
+            return {
+              role: m.role,
+              content: hadImage
+                ? `${text}\n\n[Utilizatorul a atașat o imagine, dar modelul Pro (DeepSeek) nu poate vedea imagini. Cere-i să folosească modelul Rapid pentru imagini.]`
+                : text,
+            };
+          }
+          return m;
+        })
+      : messages;
+
+    const upstream = await fetch(
+      useDeepSeek ? "https://api.deepseek.com/chat/completions" : GATEWAY_URL,
+      {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${useDeepSeek ? DEEPSEEK_API_KEY : LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: "system", content: fullSystem }, ...messages],
+        messages: [{ role: "system", content: fullSystem }, ...outMessages],
         stream: true,
         tools: [
           {
