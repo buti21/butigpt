@@ -25,6 +25,7 @@ Folosește între 5 și 12 slide-uri (în funcție de subiect), 3-6 bullet-uri s
 FIȘIERE ATAȘATE: Utilizatorul îți poate trimite conținutul unor fișiere (PDF, Word, PowerPoint, Excel, text). Va apărea în mesaj sub forma "[Conținutul fișierului ...]". Folosește acel text pentru a răspunde la întrebări, a face rezumate, a citi cu voce, a traduce sau a analiza.`;
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 const sseEncoder = new TextEncoder();
