@@ -25,6 +25,7 @@ Folosește între 5 și 12 slide-uri (în funcție de subiect), 3-6 bullet-uri s
 FIȘIERE ATAȘATE: Utilizatorul îți poate trimite conținutul unor fișiere (PDF, Word, PowerPoint, Excel, text). Va apărea în mesaj sub forma "[Conținutul fișierului ...]". Folosește acel text pentru a răspunde la întrebări, a face rezumate, a citi cu voce, a traduce sau a analiza.`;
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+const DEEPSEEK_API_KEY = Deno.env.get("DEEPSEEK_API_KEY");
 const GATEWAY_URL = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
 const sseEncoder = new TextEncoder();
@@ -67,24 +68,52 @@ serve(async (req) => {
 
     const MODEL_MAP: Record<string, string> = {
       fast: "google/gemini-3-flash-preview",
-      smart: "google/gemini-2.5-pro",
       lite: "google/gemini-3.1-flash-lite-preview",
     };
-    const model = MODEL_MAP[modelChoice as string] ?? MODEL_MAP.fast;
+
+    // "smart" (Pro) rulează pe DeepSeek (API propriu, compatibil OpenAI)
+    const useDeepSeek = modelChoice === "smart" && !!DEEPSEEK_API_KEY;
+    const model = useDeepSeek
+      ? "deepseek-chat"
+      : MODEL_MAP[modelChoice as string] ?? MODEL_MAP.fast;
 
     const fullSystem = typeof systemExtras === "string" && systemExtras.trim()
       ? `${SYSTEM_PROMPT}\n\n---\nPREFERINȚE UTILIZATOR (respectă-le strict):\n${systemExtras.trim()}`
       : SYSTEM_PROMPT;
 
-    const upstream = await fetch(GATEWAY_URL, {
+    // DeepSeek e text-only: transformă părțile de imagine în text
+    const outMessages = useDeepSeek
+      ? (messages as Array<{ role: string; content: unknown }>).map((m) => {
+          if (Array.isArray(m.content)) {
+            const text = (m.content as Array<{ type: string; text?: string }>)
+              .filter((p) => p.type === "text")
+              .map((p) => p.text ?? "")
+              .join("\n");
+            const hadImage = (m.content as Array<{ type: string }>).some(
+              (p) => p.type === "image_url",
+            );
+            return {
+              role: m.role,
+              content: hadImage
+                ? `${text}\n\n[Utilizatorul a atașat o imagine, dar modelul Pro (DeepSeek) nu poate vedea imagini. Cere-i să folosească modelul Rapid pentru imagini.]`
+                : text,
+            };
+          }
+          return m;
+        })
+      : messages;
+
+    const upstream = await fetch(
+      useDeepSeek ? "https://api.deepseek.com/chat/completions" : GATEWAY_URL,
+      {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        Authorization: `Bearer ${useDeepSeek ? DEEPSEEK_API_KEY : LOVABLE_API_KEY}`,
         "Content-Type": "application/json",
       },
       body: JSON.stringify({
         model,
-        messages: [{ role: "system", content: fullSystem }, ...messages],
+        messages: [{ role: "system", content: fullSystem }, ...outMessages],
         stream: true,
         tools: [
           {
@@ -108,7 +137,8 @@ serve(async (req) => {
           },
         ],
       }),
-    });
+    },
+    );
 
     if (!upstream.ok) {
       if (upstream.status === 429) {
@@ -117,11 +147,15 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (upstream.status === 402) {
-        return new Response(JSON.stringify({ error: "Credit AI epuizat." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      if (upstream.status === 402 || upstream.status === 401) {
+        return new Response(
+          JSON.stringify({
+            error: useDeepSeek
+              ? "Contul DeepSeek nu are credit (Insufficient Balance). Adaugă credit la platform.deepseek.com sau folosește modelul Rapid."
+              : "Credit AI epuizat.",
+          }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
       }
       const t = await upstream.text();
       console.error("AI gateway error:", upstream.status, t);
