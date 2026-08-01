@@ -1,5 +1,7 @@
-// Generează un videoclip scurt prin Fal.ai (LTX Video / Kling)
+// Generează un videoclip scurt prin Hugging Face Inference Providers (gratuit cu HF_TOKEN)
 // Rulează pe Deno (Supabase Edge Functions).
+
+import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -8,39 +10,29 @@ const corsHeaders = {
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const FAL_KEY = Deno.env.get("FAL_KEY");
+const HF_TOKEN = Deno.env.get("HF_TOKEN");
 
-// Modele Fal disponibile (rapide + calitate ok, tier gratuit)
-const MODEL_ENDPOINTS: Record<string, string> = {
-  fast: "https://queue.fal.run/fal-ai/ltx-video",
-  quality: "https://queue.fal.run/fal-ai/kling-video/v1/standard/text-to-video",
+// Modele text-to-video pe Hugging Face (rutare automată către provider)
+const MODELS: Record<string, string[]> = {
+  // rapid: LTX distilled (foarte rapid), fallback Wan 5B
+  fast: ["Lightricks/LTX-Video-0.9.8-13B-distilled", "Wan-AI/Wan2.2-TI2V-5B"],
+  // calitate: Wan 5B, fallback LTX
+  quality: ["Wan-AI/Wan2.2-TI2V-5B", "Lightricks/LTX-Video-0.9.8-13B-distilled"],
 };
-
-interface FalQueueResp {
-  status_url?: string;
-  response_url?: string;
-  request_id?: string;
-}
-
-interface FalStatusResp {
-  status: "IN_QUEUE" | "IN_PROGRESS" | "COMPLETED" | "FAILED" | string;
-}
-
-const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  if (!FAL_KEY) {
+  if (!HF_TOKEN) {
     return new Response(
-      JSON.stringify({ error: "FAL_KEY nu este configurat" }),
+      JSON.stringify({ error: "HF_TOKEN nu este configurat" }),
       { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   }
 
-  let body: { prompt?: string; quality?: string; duration?: number };
+  let body: { prompt?: string; quality?: string };
   try {
     body = await req.json();
   } catch {
@@ -58,99 +50,77 @@ Deno.serve(async (req) => {
     });
   }
 
-  const endpoint = MODEL_ENDPOINTS[body.quality ?? "fast"] ?? MODEL_ENDPOINTS.fast;
+  const models = MODELS[body.quality ?? "fast"] ?? MODELS.fast;
+  const errors: string[] = [];
 
-  try {
-    // 1. Trimite jobul în coadă
-    const submitResp = await fetch(endpoint, {
-      method: "POST",
-      headers: {
-        Authorization: `Key ${FAL_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        prompt,
-        num_frames: 121, // LTX ~5s @ 24fps
-        aspect_ratio: "16:9",
-      }),
-    });
-
-    if (!submitResp.ok) {
-      const errText = await submitResp.text();
-      console.error("Fal submit fail:", submitResp.status, errText);
-      return new Response(
-        JSON.stringify({ error: "Fal.ai a respins cererea", details: errText.slice(0, 400) }),
-        { status: submitResp.status, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    const submitted: FalQueueResp = await submitResp.json();
-    const statusUrl = submitted.status_url;
-    const responseUrl = submitted.response_url;
-    if (!statusUrl || !responseUrl) {
-      return new Response(
-        JSON.stringify({ error: "Răspuns Fal.ai neașteptat", raw: submitted }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    }
-
-    // 2. Poll status până la COMPLETED sau timeout (~90s)
-    const start = Date.now();
-    const timeoutMs = 90_000;
-    let attempt = 0;
-    while (Date.now() - start < timeoutMs) {
-      attempt++;
-      await sleep(attempt < 3 ? 2000 : 4000);
-      const stResp = await fetch(statusUrl, {
-        headers: { Authorization: `Key ${FAL_KEY}` },
+  for (const model of models) {
+    try {
+      const resp = await fetch(`https://router.huggingface.co/v1/models/${model}`, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${HF_TOKEN}`,
+          "Content-Type": "application/json",
+          Accept: "video/mp4",
+        },
+        body: JSON.stringify({
+          inputs: prompt,
+          parameters: { num_frames: 97, num_inference_steps: 20 },
+        }),
       });
-      if (!stResp.ok) continue;
-      const st: FalStatusResp = await stResp.json();
-      if (st.status === "COMPLETED") {
-        const finalResp = await fetch(responseUrl, {
-          headers: { Authorization: `Key ${FAL_KEY}` },
-        });
-        if (!finalResp.ok) {
-          const t = await finalResp.text();
-          return new Response(
-            JSON.stringify({ error: "Nu am putut prelua rezultatul", details: t.slice(0, 300) }),
-            { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        }
-        const result = await finalResp.json();
-        const videoUrl =
-          result?.video?.url ??
-          result?.videos?.[0]?.url ??
-          result?.output?.[0] ??
-          null;
-        if (!videoUrl) {
-          return new Response(
-            JSON.stringify({ error: "URL video lipsă în răspuns", raw: result }),
-            { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        }
-        return new Response(
-          JSON.stringify({ videoUrl, prompt, raw: result }),
-          { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-      if (st.status === "FAILED") {
-        return new Response(
-          JSON.stringify({ error: "Generarea a eșuat pe Fal.ai", raw: st }),
-          { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-        );
-      }
-    }
 
-    return new Response(
-      JSON.stringify({ error: "Timeout — generarea durează prea mult" }),
-      { status: 504, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
-  } catch (e) {
-    console.error("generate-video error:", e);
-    return new Response(
-      JSON.stringify({ error: e instanceof Error ? e.message : "Eroare necunoscută" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+      if (!resp.ok) {
+        const t = await resp.text();
+        console.error("HF video error:", model, resp.status, t.slice(0, 300));
+        errors.push(`${model}: ${resp.status} ${t.slice(0, 200)}`);
+        continue;
+      }
+
+      const contentType = resp.headers.get("content-type") ?? "";
+
+      // Unele provideri răspund cu JSON care conține un URL
+      if (contentType.includes("application/json")) {
+        const data = await resp.json();
+        const url =
+          data?.video?.url ??
+          data?.videos?.[0]?.url ??
+          data?.output?.[0] ??
+          data?.url ??
+          null;
+        if (url) {
+          return new Response(JSON.stringify({ videoUrl: url, prompt, model }), {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          });
+        }
+        errors.push(`${model}: răspuns JSON fără URL video`);
+        continue;
+      }
+
+      // Altfel primim bytes video direct
+      const buf = new Uint8Array(await resp.arrayBuffer());
+      if (buf.length < 1000) {
+        errors.push(`${model}: răspuns video prea mic`);
+        continue;
+      }
+      const mime = contentType.startsWith("video/") ? contentType : "video/mp4";
+      return new Response(
+        JSON.stringify({
+          videoUrl: `data:${mime};base64,${base64Encode(buf)}`,
+          prompt,
+          model,
+        }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    } catch (e) {
+      console.error("HF video exception:", model, e);
+      errors.push(`${model}: ${e instanceof Error ? e.message : "eroare"}`);
+    }
   }
+
+  return new Response(
+    JSON.stringify({
+      error: "Nu am putut genera videoclipul",
+      details: errors.join(" | ").slice(0, 600),
+    }),
+    { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
 });
