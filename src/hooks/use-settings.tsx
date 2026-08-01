@@ -90,7 +90,10 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
     try {
       const raw = localStorage.getItem(KEY);
       if (!raw) return DEFAULTS;
-      return { ...DEFAULTS, ...JSON.parse(raw) };
+      const parsed = { ...DEFAULTS, ...JSON.parse(raw) } as Settings;
+      // Vocile vechi (ElevenLabs) nu mai sunt valide — resetează la implicit
+      if (!/^[a-z]+$/.test(parsed.ttsVoiceId ?? "")) parsed.ttsVoiceId = DEFAULTS.ttsVoiceId;
+      return parsed;
     } catch {
       return DEFAULTS;
     }
