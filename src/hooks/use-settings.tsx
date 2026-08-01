@@ -55,7 +55,7 @@ const DEFAULTS: Settings = {
   typewriterSpeed: "normal",
   autoTts: false,
   ttsSpeed: 1,
-  ttsVoiceId: "EXAVITQu4vr4xnSDxMaL",
+  ttsVoiceId: "nova",
   enterToSend: true,
   model: "fast",
   saveHistory: true,
