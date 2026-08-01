@@ -147,11 +147,15 @@ serve(async (req) => {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
         });
       }
-      if (upstream.status === 402) {
-        return new Response(JSON.stringify({ error: "Credit AI epuizat." }), {
-          status: 402,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        });
+      if (upstream.status === 402 || upstream.status === 401) {
+        return new Response(
+          JSON.stringify({
+            error: useDeepSeek
+              ? "Contul DeepSeek nu are credit (Insufficient Balance). Adaugă credit la platform.deepseek.com sau folosește modelul Rapid."
+              : "Credit AI epuizat.",
+          }),
+          { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+        );
       }
       const t = await upstream.text();
       console.error("AI gateway error:", upstream.status, t);
