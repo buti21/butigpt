@@ -1,7 +1,5 @@
-// Generează un videoclip scurt prin Hugging Face Inference Providers (gratuit cu HF_TOKEN)
+// Generează un videoclip scurt prin Hugging Face Inference Providers (HF_TOKEN)
 // Rulează pe Deno (Supabase Edge Functions).
-
-import { encode as base64Encode } from "https://deno.land/std@0.168.0/encoding/base64.ts";
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,13 +9,22 @@ const corsHeaders = {
 };
 
 const HF_TOKEN = Deno.env.get("HF_TOKEN");
+const ROUTER = "https://router.huggingface.co";
 
-// Modele text-to-video pe Hugging Face (rutare automată către provider)
-const MODELS: Record<string, string[]> = {
-  // rapid: LTX distilled (foarte rapid), fallback Wan 5B
-  fast: ["Lightricks/LTX-Video-0.9.8-13B-distilled", "Wan-AI/Wan2.2-TI2V-5B"],
-  // calitate: Wan 5B, fallback LTX
-  quality: ["Wan-AI/Wan2.2-TI2V-5B", "Lightricks/LTX-Video-0.9.8-13B-distilled"],
+// Rute HF Router (provider + providerId), în ordine de fallback
+const ROUTES: Record<string, string[]> = {
+  // rapid & ieftin
+  fast: [
+    "/fal-ai/fal-ai/wan/v2.2-5b/text-to-video",
+    "/fal-ai/fal-ai/ltx-video-13b-distilled",
+    "/fal-ai/fal-ai/wan/v2.1/1.3b/text-to-video",
+  ],
+  // calitate mai bună
+  quality: [
+    "/fal-ai/fal-ai/wan/v2.2-a14b/text-to-video",
+    "/fal-ai/fal-ai/wan/v2.2-5b/text-to-video",
+    "/fal-ai/fal-ai/ltx-video-13b-distilled",
+  ],
 };
 
 Deno.serve(async (req) => {
@@ -26,10 +33,10 @@ Deno.serve(async (req) => {
   }
 
   if (!HF_TOKEN) {
-    return new Response(
-      JSON.stringify({ error: "HF_TOKEN nu este configurat" }),
-      { status: 500, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-    );
+    return new Response(JSON.stringify({ error: "HF_TOKEN nu este configurat" }), {
+      status: 500,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
   }
 
   let body: { prompt?: string; quality?: string };
@@ -50,34 +57,42 @@ Deno.serve(async (req) => {
     });
   }
 
-  const models = MODELS[body.quality ?? "fast"] ?? MODELS.fast;
+  const routes = ROUTES[body.quality ?? "fast"] ?? ROUTES.fast;
   const errors: string[] = [];
 
-  for (const model of models) {
+  for (const route of routes) {
     try {
-      const resp = await fetch(`https://router.huggingface.co/v1/models/${model}`, {
+      const resp = await fetch(`${ROUTER}${route}`, {
         method: "POST",
         headers: {
           Authorization: `Bearer ${HF_TOKEN}`,
           "Content-Type": "application/json",
-          Accept: "video/mp4",
         },
-        body: JSON.stringify({
-          inputs: prompt,
-          parameters: { num_frames: 97, num_inference_steps: 20 },
-        }),
+        body: JSON.stringify({ prompt }),
       });
-
-      if (!resp.ok) {
-        const t = await resp.text();
-        console.error("HF video error:", model, resp.status, t.slice(0, 300));
-        errors.push(`${model}: ${resp.status} ${t.slice(0, 200)}`);
-        continue;
-      }
 
       const contentType = resp.headers.get("content-type") ?? "";
 
-      // Unele provideri răspund cu JSON care conține un URL
+      if (!resp.ok) {
+        const t = await resp.text();
+        console.error("HF video error:", route, resp.status, t.slice(0, 300));
+        // Credit HF epuizat / token fără permisiuni → mesaj clar, fără fallback inutil
+        if (resp.status === 401 || resp.status === 402 || resp.status === 403) {
+          return new Response(
+            JSON.stringify({
+              error:
+                resp.status === 401 || resp.status === 403
+                  ? "Tokenul Hugging Face nu are permisiunea „Inference Providers”. Generează un token nou cu acea permisiune."
+                  : "Creditul Hugging Face pentru Inference Providers este epuizat. Adaugă credit sau așteaptă resetarea lunară.",
+              details: t.slice(0, 300),
+            }),
+            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+          );
+        }
+        errors.push(`${route}: ${resp.status} ${t.slice(0, 150)}`);
+        continue;
+      }
+
       if (contentType.includes("application/json")) {
         const data = await resp.json();
         const url =
@@ -87,32 +102,35 @@ Deno.serve(async (req) => {
           data?.url ??
           null;
         if (url) {
-          return new Response(JSON.stringify({ videoUrl: url, prompt, model }), {
+          return new Response(JSON.stringify({ videoUrl: url, prompt, model: route }), {
             headers: { ...corsHeaders, "Content-Type": "application/json" },
           });
         }
-        errors.push(`${model}: răspuns JSON fără URL video`);
+        errors.push(`${route}: răspuns fără URL video`);
         continue;
       }
 
-      // Altfel primim bytes video direct
+      // Unele provideri întorc bytes video direct
       const buf = new Uint8Array(await resp.arrayBuffer());
       if (buf.length < 1000) {
-        errors.push(`${model}: răspuns video prea mic`);
+        errors.push(`${route}: răspuns video prea mic`);
         continue;
       }
-      const mime = contentType.startsWith("video/") ? contentType : "video/mp4";
+      let binary = "";
+      for (let i = 0; i < buf.length; i += 8192) {
+        binary += String.fromCharCode(...buf.subarray(i, i + 8192));
+      }
       return new Response(
         JSON.stringify({
-          videoUrl: `data:${mime};base64,${base64Encode(buf)}`,
+          videoUrl: `data:video/mp4;base64,${btoa(binary)}`,
           prompt,
-          model,
+          model: route,
         }),
         { headers: { ...corsHeaders, "Content-Type": "application/json" } },
       );
     } catch (e) {
-      console.error("HF video exception:", model, e);
-      errors.push(`${model}: ${e instanceof Error ? e.message : "eroare"}`);
+      console.error("HF video exception:", route, e);
+      errors.push(`${route}: ${e instanceof Error ? e.message : "eroare"}`);
     }
   }
 
