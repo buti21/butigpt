@@ -136,7 +136,8 @@ serve(async (req) => {
           },
         ],
       }),
-    });
+    },
+    );
 
     if (!upstream.ok) {
       if (upstream.status === 429) {
