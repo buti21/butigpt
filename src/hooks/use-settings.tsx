@@ -5,6 +5,7 @@ export type ColorTheme = "violet" | "ocean" | "sunset" | "mono" | "forest";
 export type TypewriterSpeed = "slow" | "normal" | "fast" | "instant";
 export type ModelChoice = "fast" | "smart" | "lite";
 export type ResponseLanguage = "auto" | "ro" | "en" | "fr" | "es" | "de" | "it";
+export type VideoQuality = "fast" | "quality";
 export type ResponseTone = "default" | "casual" | "formal" | "concise" | "playful" | "expert";
 
 interface Settings {
@@ -25,6 +26,8 @@ interface Settings {
   followUps: boolean;
   compactMode: boolean;
   showTimestamps: boolean;
+  videoQuality: VideoQuality;
+  videoFrames: number;
 }
 
 interface SettingsCtx extends Settings {
@@ -45,6 +48,8 @@ interface SettingsCtx extends Settings {
   setFollowUps: (v: boolean) => void;
   setCompactMode: (v: boolean) => void;
   setShowTimestamps: (v: boolean) => void;
+  setVideoQuality: (v: VideoQuality) => void;
+  setVideoFrames: (v: number) => void;
 }
 
 const KEY = "butigpt:settings:v1";
@@ -67,6 +72,8 @@ const DEFAULTS: Settings = {
   followUps: false,
   compactMode: false,
   showTimestamps: false,
+  videoQuality: "fast",
+  videoFrames: 4,
 };
 
 const Ctx = createContext<SettingsCtx | null>(null);
@@ -139,6 +146,8 @@ export const SettingsProvider = ({ children }: { children: ReactNode }) => {
         setFollowUps: (followUps) => update({ followUps }),
         setCompactMode: (compactMode) => update({ compactMode }),
         setShowTimestamps: (showTimestamps) => update({ showTimestamps }),
+        setVideoQuality: (videoQuality) => update({ videoQuality }),
+        setVideoFrames: (videoFrames) => update({ videoFrames: Math.max(2, Math.min(8, Math.round(videoFrames))) }),
       }}
     >
       {children}
