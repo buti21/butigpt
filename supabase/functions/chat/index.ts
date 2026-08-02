@@ -73,7 +73,7 @@ serve(async (req) => {
 
     // "smart" (Pro) rulează pe DeepSeek (API propriu, compatibil OpenAI)
     const useDeepSeek = modelChoice === "smart" && !!DEEPSEEK_API_KEY;
-    const model = useDeepSeek
+    let model = useDeepSeek
       ? "deepseek-chat"
       : MODEL_MAP[modelChoice as string] ?? MODEL_MAP.fast;
 
@@ -103,42 +103,53 @@ serve(async (req) => {
         })
       : messages;
 
-    const upstream = await fetch(
-      useDeepSeek ? "https://api.deepseek.com/chat/completions" : GATEWAY_URL,
+    const TOOLS = [
       {
-      method: "POST",
-      headers: {
-        Authorization: `Bearer ${useDeepSeek ? DEEPSEEK_API_KEY : LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model,
-        messages: [{ role: "system", content: fullSystem }, ...outMessages],
-        stream: true,
-        tools: [
-          {
-            type: "function",
-            function: {
-              name: "generate_image",
-              description:
-                "Generează o imagine pe baza unui prompt detaliat. Folosește doar când utilizatorul cere explicit o poză/imagine/ilustrație.",
-              parameters: {
-                type: "object",
-                properties: {
-                  prompt: {
-                    type: "string",
-                    description: "Prompt detaliat în engleză pentru generarea imaginii.",
-                  },
-                },
-                required: ["prompt"],
-                additionalProperties: false,
+        type: "function",
+        function: {
+          name: "generate_image",
+          description:
+            "Generează o imagine pe baza unui prompt detaliat. Folosește doar când utilizatorul cere explicit o poză/imagine/ilustrație.",
+          parameters: {
+            type: "object",
+            properties: {
+              prompt: {
+                type: "string",
+                description: "Prompt detaliat în engleză pentru generarea imaginii.",
               },
             },
+            required: ["prompt"],
+            additionalProperties: false,
           },
-        ],
-      }),
-    },
-    );
+        },
+      },
+    ];
+
+    const callUpstream = (viaDeepSeek: boolean) =>
+      fetch(viaDeepSeek ? "https://api.deepseek.com/chat/completions" : GATEWAY_URL, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${viaDeepSeek ? DEEPSEEK_API_KEY : LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model: viaDeepSeek ? "deepseek-chat" : model,
+          ...(viaDeepSeek ? {} : { reasoning_effort: "none" }),
+          messages: [{ role: "system", content: fullSystem }, ...(viaDeepSeek ? outMessages : messages)],
+          stream: true,
+          tools: TOOLS,
+        }),
+      });
+
+    let upstream = await callUpstream(useDeepSeek);
+
+    // DeepSeek fără credit (402) sau cheie invalidă (401) → trecem automat pe
+    // modelul Pro de pe Lovable AI, ca să nu se blocheze conversația.
+    if (useDeepSeek && (upstream.status === 402 || upstream.status === 401)) {
+      console.warn("DeepSeek indisponibil, fallback pe Lovable AI Pro");
+      model = "openai/gpt-5.6-sol";
+      upstream = await callUpstream(false);
+    }
 
     if (!upstream.ok) {
       if (upstream.status === 429) {
@@ -149,11 +160,7 @@ serve(async (req) => {
       }
       if (upstream.status === 402 || upstream.status === 401) {
         return new Response(
-          JSON.stringify({
-            error: useDeepSeek
-              ? "Contul DeepSeek nu are credit (Insufficient Balance). Adaugă credit la platform.deepseek.com sau folosește modelul Rapid."
-              : "Credit AI epuizat.",
-          }),
+          JSON.stringify({ error: "Credit AI epuizat. Adaugă credit în workspace." }),
           { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
         );
       }
@@ -164,6 +171,7 @@ serve(async (req) => {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
+
 
     // We re-stream upstream SSE to the client, intercepting tool calls to
     // generate images and emit a custom SSE event with the image data URL.

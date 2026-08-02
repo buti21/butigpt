@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { Dialog, DialogContent, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Mic, MicOff, PhoneOff, Loader2, Volume2, User, FileText } from "lucide-react";
-import { useSpeechRecognition } from "@/hooks/use-speech-recognition";
+import { useVoiceRecorder } from "@/hooks/use-voice-recorder";
 import { useSettings } from "@/hooks/use-settings";
 import { toast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
@@ -17,9 +17,9 @@ type CallState = "idle" | "listening" | "thinking" | "speaking";
 
 const CHAT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/chat`;
 const TTS_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/tts`;
+const STT_URL = `${import.meta.env.VITE_SUPABASE_URL}/functions/v1/transcribe`;
 const ANON = import.meta.env.VITE_SUPABASE_PUBLISHABLE_KEY as string;
 
-// Fallback la sinteza vocală din browser dacă serviciul premium eșuează
 const speakWithBrowser = (text: string, lang: string, rate: number): Promise<void> =>
   new Promise((resolve) => {
     if (typeof window === "undefined" || !("speechSynthesis" in window)) {
@@ -48,14 +48,12 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
   const [muted, setMuted] = useState(false);
   const [usingFallbackTts, setUsingFallbackTts] = useState(false);
   const [showTranscript, setShowTranscript] = useState(true);
+
   const historyRef = useRef<{ role: "user" | "assistant"; content: string }[]>([]);
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const silenceTimerRef = useRef<number | null>(null);
-  const finalBufferRef = useRef("");
   const fallbackRef = useRef(false);
   const stateRef = useRef<CallState>("idle");
-  const cooldownUntilRef = useRef(0);
-  const lastSubmittedRef = useRef<string>("");
+  const busyRef = useRef(false);
 
   useEffect(() => { stateRef.current = state; }, [state]);
 
@@ -65,6 +63,7 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
     s.language === "es" ? "es-ES" :
     s.language === "de" ? "de-DE" :
     s.language === "it" ? "it-IT" : "ro-RO";
+  const sttLang = lang.slice(0, 2);
 
   const stopAudio = useCallback(() => {
     if (audioRef.current) {
@@ -80,7 +79,6 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
   const speak = useCallback(
     async (cleanText: string): Promise<void> => {
       if (!cleanText) return;
-      // Dacă am picat deja pe fallback în sesiunea asta, rămânem acolo
       if (fallbackRef.current) {
         await speakWithBrowser(cleanText, lang, s.ttsSpeed || 1);
         return;
@@ -89,7 +87,7 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
         const ttsResp = await fetch(TTS_URL, {
           method: "POST",
           headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
-          body: JSON.stringify({ text: cleanText.slice(0, 800), voiceId: s.ttsVoiceId }),
+          body: JSON.stringify({ text: cleanText.slice(0, 900), voiceId: s.ttsVoiceId }),
         });
         if (!ttsResp.ok) throw new Error(`tts ${ttsResp.status}`);
         const data = await ttsResp.json();
@@ -121,7 +119,7 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
       historyRef.current.push({ role: "user", content: userText });
 
       const systemExtras =
-        `Ești în modul APEL VOCAL. Răspunde SCURT (1-3 propoziții), natural și conversațional, ca într-un apel telefonic. Fără liste, fără markdown, fără cod. ` +
+        `Ești în modul APEL VOCAL. Răspunde MEREU, scurt (1-3 propoziții), natural și conversațional, ca într-un apel telefonic. Fără liste, fără markdown, fără cod, fără emoji. Dacă mesajul e neclar, cere politicos o reformulare. ` +
         (s.aboutYou ? `Despre utilizator: ${s.aboutYou}. ` : "") +
         (s.customInstructions ? `Preferințe: ${s.customInstructions}` : "");
 
@@ -129,13 +127,11 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
       try {
         const resp = await fetch(CHAT_URL, {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${ANON}`,
-          },
+          headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON}` },
           body: JSON.stringify({
-            messages: historyRef.current,
-            model: s.model,
+            messages: historyRef.current.slice(-12),
+            // În apel folosim mereu un model rapid, ca să nu existe pauze lungi
+            model: s.model === "smart" ? "fast" : s.model,
             systemExtras,
           }),
         });
@@ -172,96 +168,95 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
         }
       } catch (e) {
         console.error("chat call failed:", e);
-        toast({
-          title: "Eroare apel",
-          description: e instanceof Error ? e.message : "Nu am putut răspunde.",
-          variant: "destructive",
-        });
+        const msg = "Scuze, nu am reușit să răspund. Mai spune-mi o dată, te rog.";
+        setReply(msg);
+        setState("speaking");
+        await speak(msg);
         setState("listening");
         return;
       }
 
-      const cleanText = full.replace(/[*_`#>\[\]()]/g, "").trim();
+      let cleanText = full.replace(/[*_`#>[\]()]/g, "").trim();
       if (!cleanText) {
-        setState("listening");
-        return;
+        cleanText = "Nu am prins ce ai spus. Poți repeta, te rog?";
+        setReply(cleanText);
       }
       historyRef.current.push({ role: "assistant", content: cleanText });
 
       setState("speaking");
       await speak(cleanText);
-      // Cooldown scurt după ce termină vocea — să nu se prindă ecoul TTS-ului
-      cooldownUntilRef.current = Date.now() + 700;
-      finalBufferRef.current = "";
       setTranscript("");
       setState("listening");
     },
     [s.model, s.aboutYou, s.customInstructions, speak],
   );
 
-  const { isListening, isSupported, start, stop } = useSpeechRecognition({
-    lang,
-    onResult: (text, isFinal) => {
-      if (!text) return;
-      // Ignoră ORICE input când nu ascultăm activ sau când e cooldown activ
-      if (stateRef.current !== "listening") return;
-      if (Date.now() < cooldownUntilRef.current) return;
-
-      if (isFinal) {
-        // Dedup: dacă browserul re-emite exact aceeași frază, ignoră-o
-        const clean = text.trim();
-        if (!clean) return;
-        const combined = (finalBufferRef.current + " " + clean).trim();
-        finalBufferRef.current = combined;
-        setTranscript(combined);
-        if (silenceTimerRef.current) window.clearTimeout(silenceTimerRef.current);
-        silenceTimerRef.current = window.setTimeout(() => {
-          const t = finalBufferRef.current.trim();
-          finalBufferRef.current = "";
-          setTranscript("");
-          // Nu re-trimite aceeași frază de două ori consecutiv
-          if (t && t !== lastSubmittedRef.current) {
-            lastSubmittedRef.current = t;
-            askAndSpeak(t);
-          }
-        }, 900);
-      } else {
-        const shown = (finalBufferRef.current + " " + text).trim();
-        setTranscript(shown);
+  const handleUtterance = useCallback(
+    async (wav: Blob) => {
+      if (busyRef.current || stateRef.current !== "listening") return;
+      busyRef.current = true;
+      try {
+        setState("thinking");
+        setTranscript("");
+        const fd = new FormData();
+        fd.append("file", wav, "recording.wav");
+        fd.append("language", sttLang);
+        const resp = await fetch(STT_URL, {
+          method: "POST",
+          headers: { Authorization: `Bearer ${ANON}` },
+          body: fd,
+        });
+        const data = await resp.json().catch(() => ({}));
+        const text = (data?.text ?? "").trim();
+        if (!resp.ok) throw new Error(data?.error || `stt ${resp.status}`);
+        if (!text || text.length < 2) {
+          setState("listening");
+          return;
+        }
+        setTranscript(text);
+        await askAndSpeak(text);
+      } catch (e) {
+        console.error("transcriere eșuată:", e);
+        toast({
+          title: "Nu am înțeles",
+          description: e instanceof Error ? e.message : "Reîncearcă să vorbești.",
+          variant: "destructive",
+        });
+        setState("listening");
+      } finally {
+        busyRef.current = false;
       }
     },
+    [askAndSpeak, sttLang],
+  );
+
+  const { isRecording, level, error, start, stop, setPaused } = useVoiceRecorder({
+    onUtterance: handleUtterance,
   });
+
+  // Microfonul rămâne deschis, dar e „pauzat” cât timp gândim / vorbim
+  useEffect(() => {
+    setPaused(muted || state !== "listening");
+  }, [muted, state, setPaused]);
 
   useEffect(() => {
     if (!open) return;
-    if (muted) { stop(); return; }
-    if (state === "listening" && !isListening) {
-      start();
-    }
-    if (state === "speaking" || state === "thinking") {
-      if (isListening) stop();
-      finalBufferRef.current = "";
-      setTranscript("");
-    }
-  }, [state, open, muted, isListening, start, stop]);
-
-  useEffect(() => {
-    if (open) {
-      historyRef.current = [];
-      fallbackRef.current = false;
-      setUsingFallbackTts(false);
-      setTranscript("");
-      setReply("");
-      setLastUser("");
-      setMuted(false);
-      setState("listening");
-    } else {
+    historyRef.current = [];
+    fallbackRef.current = false;
+    busyRef.current = false;
+    setUsingFallbackTts(false);
+    setTranscript("");
+    setReply("");
+    setLastUser("");
+    setMuted(false);
+    setState("listening");
+    start();
+    return () => {
       stop();
       stopAudio();
-      if (silenceTimerRef.current) window.clearTimeout(silenceTimerRef.current);
       setState("idle");
-    }
-  }, [open, stop, stopAudio]);
+    };
+  }, [open, start, stop, stopAudio]);
 
   const endCall = () => {
     stop();
@@ -270,7 +265,7 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
   };
 
   const label =
-    state === "listening" ? "Ascult…" :
+    state === "listening" ? (level > 0.02 ? "Te aud…" : "Ascult…") :
     state === "thinking" ? "Se gândește…" :
     state === "speaking" ? "Vorbește…" : "Pregătit";
 
@@ -281,11 +276,18 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
         <DialogDescription className="sr-only">Vorbește cu ButiGPT ca într-un apel telefonic</DialogDescription>
 
         <div className="flex-1 flex flex-col items-center justify-center px-6 py-8 gap-5 min-h-0 overflow-y-auto">
-          <div className={cn(
-            "relative flex items-center justify-center rounded-full transition-all duration-500 flex-shrink-0",
-            "h-32 w-32 sm:h-40 sm:w-40 bg-gradient-primary shadow-glow",
-            (state === "listening" || state === "speaking") && "animate-pulse"
-          )}>
+          <div
+            className={cn(
+              "relative flex items-center justify-center rounded-full transition-all duration-300 flex-shrink-0",
+              "h-32 w-32 sm:h-40 sm:w-40 bg-gradient-primary shadow-glow",
+              state === "speaking" && "animate-pulse",
+            )}
+            style={
+              state === "listening" && !muted
+                ? { transform: `scale(${1 + Math.min(0.18, level * 2.2)})` }
+                : undefined
+            }
+          >
             <div className={cn(
               "absolute inset-0 rounded-full bg-primary/30 blur-2xl",
               state === "speaking" && "animate-ping"
@@ -301,7 +303,6 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
             )}
           </div>
 
-          {/* Transcript LIVE — se poate ascunde */}
           {showTranscript && (
             <div className="w-full max-w-sm space-y-2">
               {lastUser && (
@@ -319,23 +320,23 @@ export const VoiceCallDialog = ({ open, onOpenChange }: Props) => {
                 </div>
                 {state === "thinking" && !reply && (
                   <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="h-4 w-4 animate-spin" /> Se gândește…
+                    <Loader2 className="h-4 w-4 animate-spin" />
+                    {transcript ? "Se gândește…" : "Transcriu…"}
                   </div>
                 )}
                 {(state === "speaking" || (state === "thinking" && reply)) && (
                   <p className="leading-relaxed">{reply || "…"}</p>
                 )}
                 {state === "listening" && (
-                  <p className={cn("leading-relaxed", !transcript && "italic text-muted-foreground")}>
-                    {transcript || (reply ? reply : "Spune ceva…")}
+                  <p className={cn("leading-relaxed", !transcript && !reply && "italic text-muted-foreground")}>
+                    {transcript || reply || "Spune ceva…"}
                   </p>
                 )}
               </div>
 
-              {!isSupported && (
-                <div className="text-xs text-destructive text-center">
-                  Browserul tău nu suportă recunoașterea vocală. Încearcă Chrome sau Safari iOS.
-                </div>
+              {error && <div className="text-xs text-destructive text-center">{error}</div>}
+              {!error && !isRecording && (
+                <div className="text-xs text-muted-foreground text-center">Se pornește microfonul…</div>
               )}
             </div>
           )}

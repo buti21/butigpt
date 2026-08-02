@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { useSettings } from "@/hooks/use-settings";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
@@ -21,8 +22,11 @@ const SUGGESTIONS = [
 ];
 
 export const VideoGenDialog = ({ open, onOpenChange, onGenerate, isGenerating }: Props) => {
+  const s = useSettings();
   const [prompt, setPrompt] = useState("");
-  const [quality, setQuality] = useState<"fast" | "quality">("fast");
+  const [quality, setQuality] = useState<"fast" | "quality">(s.videoQuality);
+
+  useEffect(() => setQuality(s.videoQuality), [s.videoQuality]);
 
   const submit = async () => {
     const p = prompt.trim();
@@ -43,7 +47,7 @@ export const VideoGenDialog = ({ open, onOpenChange, onGenerate, isGenerating }:
             <div>
               <DialogTitle>Generează video</DialogTitle>
               <DialogDescription className="text-xs">
-                Descrie ce vrei să apară în clip (5-10 secunde).
+                Descrie ce vrei să apară în clip. Generat cu Lovable AI, fără chei externe.
               </DialogDescription>
             </div>
           </div>
@@ -78,14 +82,16 @@ export const VideoGenDialog = ({ open, onOpenChange, onGenerate, isGenerating }:
 
           <div className="flex items-center justify-between gap-4">
             <div className="min-w-0">
-              <Label className="text-sm">Calitate</Label>
-              <p className="text-[11px] text-muted-foreground">Rapid ≈ 20s • Calitate ≈ 60s</p>
+              <Label className="text-sm">Model video</Label>
+              <p className="text-[11px] text-muted-foreground">
+                {s.videoFrames} cadre ≈ {(s.videoFrames * 1.6).toFixed(1)}s • se schimbă în Setări → Voce
+              </p>
             </div>
             <Select value={quality} onValueChange={(v) => setQuality(v as "fast" | "quality")} disabled={isGenerating}>
               <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="fast">Rapid (LTX)</SelectItem>
-                <SelectItem value="quality">Calitate (Kling)</SelectItem>
+                <SelectItem value="fast">Rapid (Flash Image)</SelectItem>
+                <SelectItem value="quality">Cinematic (Pro Image)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -102,7 +108,7 @@ export const VideoGenDialog = ({ open, onOpenChange, onGenerate, isGenerating }:
             )}
           </Button>
           <p className="text-[11px] text-muted-foreground text-center">
-            Generarea durează 20-90 secunde. Nu închide fila.
+            Generarea durează 30-90 secunde (cadre AI + montaj). Nu închide fila.
           </p>
         </div>
       </DialogContent>

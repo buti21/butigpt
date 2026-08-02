@@ -9,6 +9,7 @@ import { SettingsDialog } from "@/components/buti/SettingsDialog";
 import { ShareDialog } from "@/components/buti/ShareDialog";
 import { VoiceCallDialog } from "@/components/buti/VoiceCallDialog";
 import { VideoGenDialog } from "@/components/buti/VideoGenDialog";
+import { buildVideoFromFrames } from "@/lib/framesToVideo";
 
 import { useAuth } from "@/hooks/use-auth";
 import { useSettings } from "@/hooks/use-settings";
@@ -121,6 +122,8 @@ const Index = () => {
     aboutYou,
     followUps,
     enterToSend,
+    videoFrames,
+    videoQuality,
   } = useSettings();
   const speedMul =
     typewriterSpeed === "slow" ? 2.2 :
@@ -436,18 +439,31 @@ const Index = () => {
       const resp = await fetch(VIDEO_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON_KEY}` },
-        body: JSON.stringify({ prompt, quality }),
+        body: JSON.stringify({ prompt, quality, frames: videoFrames }),
       });
       const data = await resp.json();
-      if (!resp.ok || !data?.videoUrl) {
+      if (!resp.ok || !Array.isArray(data?.frames) || data.frames.length < 2) {
         throw new Error(data?.error || `HTTP ${resp.status}`);
       }
+
+      updateConv(convId!, (c) => ({
+        ...c,
+        messages: c.messages.map((m) =>
+          m.id === assistantId ? { ...m, content: "🎞️ Montez cadrele în videoclip…" } : m,
+        ),
+      }));
+
+      const built = await buildVideoFromFrames({
+        frames: data.frames as string[],
+        secondsPerFrame: data.secondsPerFrame ?? 1.6,
+        fps: data.fps ?? 24,
+      });
       updateConv(convId!, (c) => ({
         ...c,
         updatedAt: Date.now(),
         messages: c.messages.map((m) =>
           m.id === assistantId
-            ? { ...m, content: "Iată videoclipul generat:", video: { url: data.videoUrl, prompt } }
+            ? { ...m, content: "Iată videoclipul generat:", video: { url: built.url, prompt } }
             : m,
         ),
       }));
