@@ -1,45 +1,132 @@
-// Generează un videoclip scurt prin Hugging Face Inference Providers (HF_TOKEN)
-// Rulează pe Deno (Supabase Edge Functions).
+// Generare video prin Lovable AI (fără provider extern, fără chei suplimentare).
+// Strategie: modelul de imagini Gemini (Nano Banana) generează keyframe-uri
+// coerente între ele, iar aplicația le asamblează într-un clip real (WebM)
+// cu interpolare/crossfade în browser.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
   "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type",
+    "authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version",
   "Access-Control-Allow-Methods": "POST, OPTIONS",
 };
 
-const HF_TOKEN = Deno.env.get("HF_TOKEN");
-const ROUTER = "https://router.huggingface.co";
+const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
 
-// Rute HF Router (provider + providerId), în ordine de fallback
-const ROUTES: Record<string, string[]> = {
-  // rapid & ieftin
-  fast: [
-    "/fal-ai/fal-ai/wan/v2.2-5b/text-to-video",
-    "/fal-ai/fal-ai/ltx-video-13b-distilled",
-    "/fal-ai/fal-ai/wan/v2.1/1.3b/text-to-video",
-  ],
-  // calitate mai bună
-  quality: [
-    "/fal-ai/fal-ai/wan/v2.2-a14b/text-to-video",
-    "/fal-ai/fal-ai/wan/v2.2-5b/text-to-video",
-    "/fal-ai/fal-ai/ltx-video-13b-distilled",
-  ],
+// Modele de imagine disponibile pe Lovable AI
+const IMAGE_MODELS: Record<string, string> = {
+  fast: "google/gemini-3.1-flash-image",
+  quality: "google/gemini-3-pro-image",
+  banana: "google/gemini-2.5-flash-image",
 };
 
-Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+interface Body {
+  prompt?: string;
+  quality?: string;
+  frames?: number;
+}
+
+async function shotList(prompt: string, count: number): Promise<string[]> {
+  try {
+    const resp = await fetch(GATEWAY, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${LOVABLE_API_KEY}`,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        model: "openai/gpt-5.6-sol",
+        reasoning_effort: "none",
+        messages: [
+          {
+            role: "system",
+            content:
+              `You are a cinematographer. Split the user's idea into exactly ${count} consecutive keyframes of ONE continuous shot (same subject, same style, same lighting, small progressive motion between frames). ` +
+              `Reply ONLY with ${count} lines, no numbering, each line a detailed English image prompt (max 45 words) describing that moment, always ending with ", cinematic, photorealistic, 16:9".`,
+          },
+          { role: "user", content: prompt },
+        ],
+      }),
+    });
+    if (!resp.ok) throw new Error(`shotlist ${resp.status}`);
+    const data = await resp.json();
+    const text: string = data.choices?.[0]?.message?.content ?? "";
+    const lines = text
+      .split("\n")
+      .map((l) => l.replace(/^\s*[-*\d.)]+\s*/, "").trim())
+      .filter((l) => l.length > 10)
+      .slice(0, count);
+    if (lines.length >= 2) return lines;
+    throw new Error("shotlist prea scurtă");
+  } catch (e) {
+    console.warn("shotlist fallback:", e);
+    return Array.from({ length: count }, (_, i) =>
+      `${prompt}, moment ${i + 1} of ${count} of one continuous camera move, cinematic, photorealistic, 16:9`,
+    );
+  }
+}
+
+async function genFrame(
+  model: string,
+  framePrompt: string,
+  previous: string | null,
+): Promise<string | null> {
+  const content: unknown[] = [];
+  if (previous) {
+    content.push({ type: "image_url", image_url: { url: previous } });
+    content.push({
+      type: "text",
+      text:
+        `Continue this exact scene as the NEXT video frame. Keep the same subject, style, colors and lighting; change only motion slightly. New frame: ${framePrompt}`,
+    });
+  } else {
+    content.push({ type: "text", text: framePrompt });
   }
 
-  if (!HF_TOKEN) {
-    return new Response(JSON.stringify({ error: "HF_TOKEN nu este configurat" }), {
+  for (let attempt = 0; attempt < 2; attempt++) {
+    try {
+      const resp = await fetch(GATEWAY, {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${LOVABLE_API_KEY}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          model,
+          messages: [{ role: "user", content }],
+          modalities: ["image", "text"],
+        }),
+      });
+      if (!resp.ok) {
+        const t = await resp.text().catch(() => "");
+        console.error("frame error:", model, resp.status, t.slice(0, 200));
+        if (resp.status === 402 || resp.status === 429) {
+          throw Object.assign(new Error(t.slice(0, 200)), { status: resp.status });
+        }
+        continue;
+      }
+      const data = await resp.json();
+      const url = data.choices?.[0]?.message?.images?.[0]?.image_url?.url ?? null;
+      if (url) return url;
+    } catch (e) {
+      if ((e as { status?: number }).status) throw e;
+      console.error("frame exception:", e);
+    }
+  }
+  return null;
+}
+
+Deno.serve(async (req) => {
+  if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
+
+  if (!LOVABLE_API_KEY) {
+    return new Response(JSON.stringify({ error: "LOVABLE_API_KEY nu este configurat" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
   }
 
-  let body: { prompt?: string; quality?: string };
+  let body: Body;
   try {
     body = await req.json();
   } catch {
@@ -57,88 +144,47 @@ Deno.serve(async (req) => {
     });
   }
 
-  const routes = ROUTES[body.quality ?? "fast"] ?? ROUTES.fast;
-  const errors: string[] = [];
+  const qualityKey = body.quality && IMAGE_MODELS[body.quality] ? body.quality : "fast";
+  const model = IMAGE_MODELS[qualityKey];
+  const count = Math.max(2, Math.min(8, body.frames ?? (qualityKey === "quality" ? 6 : 4)));
 
-  for (const route of routes) {
-    try {
-      const resp = await fetch(`${ROUTER}${route}`, {
-        method: "POST",
-        headers: {
-          Authorization: `Bearer ${HF_TOKEN}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ prompt }),
-      });
+  try {
+    const prompts = await shotList(prompt, count);
+    const frames: string[] = [];
+    let previous: string | null = null;
 
-      const contentType = resp.headers.get("content-type") ?? "";
-
-      if (!resp.ok) {
-        const t = await resp.text();
-        console.error("HF video error:", route, resp.status, t.slice(0, 300));
-        // Credit HF epuizat / token fără permisiuni → mesaj clar, fără fallback inutil
-        if (resp.status === 401 || resp.status === 402 || resp.status === 403) {
-          return new Response(
-            JSON.stringify({
-              error:
-                resp.status === 401 || resp.status === 403
-                  ? "Tokenul Hugging Face nu are permisiunea „Inference Providers”. Generează un token nou cu acea permisiune."
-                  : "Creditul Hugging Face pentru Inference Providers este epuizat. Adaugă credit sau așteaptă resetarea lunară.",
-              details: t.slice(0, 300),
-            }),
-            { status: 402, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-          );
-        }
-        errors.push(`${route}: ${resp.status} ${t.slice(0, 150)}`);
-        continue;
-      }
-
-      if (contentType.includes("application/json")) {
-        const data = await resp.json();
-        const url =
-          data?.video?.url ??
-          data?.videos?.[0]?.url ??
-          data?.output?.[0] ??
-          data?.url ??
-          null;
-        if (url) {
-          return new Response(JSON.stringify({ videoUrl: url, prompt, model: route }), {
-            headers: { ...corsHeaders, "Content-Type": "application/json" },
-          });
-        }
-        errors.push(`${route}: răspuns fără URL video`);
-        continue;
-      }
-
-      // Unele provideri întorc bytes video direct
-      const buf = new Uint8Array(await resp.arrayBuffer());
-      if (buf.length < 1000) {
-        errors.push(`${route}: răspuns video prea mic`);
-        continue;
-      }
-      let binary = "";
-      for (let i = 0; i < buf.length; i += 8192) {
-        binary += String.fromCharCode(...buf.subarray(i, i + 8192));
-      }
-      return new Response(
-        JSON.stringify({
-          videoUrl: `data:video/mp4;base64,${btoa(binary)}`,
-          prompt,
-          model: route,
-        }),
-        { headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
-    } catch (e) {
-      console.error("HF video exception:", route, e);
-      errors.push(`${route}: ${e instanceof Error ? e.message : "eroare"}`);
+    for (const p of prompts) {
+      const url = await genFrame(model, p, previous);
+      if (!url) continue;
+      frames.push(url);
+      previous = url;
     }
-  }
 
-  return new Response(
-    JSON.stringify({
-      error: "Nu am putut genera videoclipul",
-      details: errors.join(" | ").slice(0, 600),
-    }),
-    { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-  );
+    if (frames.length < 2) {
+      return new Response(
+        JSON.stringify({ error: "Nu am putut genera suficiente cadre. Reîncearcă." }),
+        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+      );
+    }
+
+    return new Response(
+      JSON.stringify({ frames, fps: 24, secondsPerFrame: 1.6, model, prompt }),
+      { headers: { ...corsHeaders, "Content-Type": "application/json" } },
+    );
+  } catch (e) {
+    const status = (e as { status?: number }).status;
+    const msg =
+      status === 402
+        ? "Creditul Lovable AI este epuizat. Adaugă credit în workspace pentru a genera video."
+        : status === 429
+          ? "Prea multe cereri. Așteaptă puțin și reîncearcă."
+          : e instanceof Error
+            ? e.message
+            : "eroare";
+    console.error("video gen failed:", msg);
+    return new Response(JSON.stringify({ error: msg }), {
+      status: status === 402 ? 402 : status === 429 ? 429 : 502,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
 });
