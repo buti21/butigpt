@@ -122,6 +122,8 @@ const Index = () => {
     aboutYou,
     followUps,
     enterToSend,
+    videoFrames,
+    videoQuality,
   } = useSettings();
   const speedMul =
     typewriterSpeed === "slow" ? 2.2 :
@@ -437,7 +439,7 @@ const Index = () => {
       const resp = await fetch(VIDEO_URL, {
         method: "POST",
         headers: { "Content-Type": "application/json", Authorization: `Bearer ${ANON_KEY}` },
-        body: JSON.stringify({ prompt, quality, frames: settings.videoFrames }),
+        body: JSON.stringify({ prompt, quality, frames: videoFrames }),
       });
       const data = await resp.json();
       if (!resp.ok || !Array.isArray(data?.frames) || data.frames.length < 2) {
