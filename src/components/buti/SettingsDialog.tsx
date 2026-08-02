@@ -23,6 +23,7 @@ import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { Slider } from "@/components/ui/slider";
+import { AudioSelfTest } from "@/components/buti/AudioSelfTest";
 import {
   Select,
   SelectContent,
@@ -296,6 +297,39 @@ export const SettingsDialog = ({
                     value={[s.ttsSpeed]}
                     onValueChange={(v) => s.setTtsSpeed(v[0])}
                   />
+                </div>
+
+                <AudioSelfTest />
+
+                <div className="pt-2 border-t border-border space-y-4">
+                  <div>
+                    <Label className="text-sm">Model video</Label>
+                    <p className="text-xs text-muted-foreground mt-0.5 mb-2">
+                      Folosit la generarea clipurilor. Cinematic = cadre mai frumoase, dar mai lent.
+                    </p>
+                    <Select value={s.videoQuality} onValueChange={(v) => s.setVideoQuality(v as "fast" | "quality")}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="fast">Rapid — Gemini Flash Image</SelectItem>
+                        <SelectItem value="quality">Cinematic — Gemini Pro Image</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div>
+                    <div className="mb-2">
+                      <Label className="text-sm">Cadre pe clip</Label>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        {s.videoFrames} cadre ≈ {(s.videoFrames * 1.6).toFixed(1)}s de video
+                      </p>
+                    </div>
+                    <Slider
+                      min={2}
+                      max={8}
+                      step={1}
+                      value={[s.videoFrames]}
+                      onValueChange={(v) => s.setVideoFrames(v[0])}
+                    />
+                  </div>
                 </div>
               </TabsContent>
 
