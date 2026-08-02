@@ -73,7 +73,7 @@ serve(async (req) => {
 
     // "smart" (Pro) rulează pe DeepSeek (API propriu, compatibil OpenAI)
     const useDeepSeek = modelChoice === "smart" && !!DEEPSEEK_API_KEY;
-    const model = useDeepSeek
+    let model = useDeepSeek
       ? "deepseek-chat"
       : MODEL_MAP[modelChoice as string] ?? MODEL_MAP.fast;
 
