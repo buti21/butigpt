@@ -401,8 +401,11 @@ Deno.serve(async (req) => {
 
   const qualityKey = body.quality && IMAGE_MODELS[body.quality] ? body.quality : "fast";
 
-  // 1) încearcă video real (mișcare adevărată)
-  const real = await tryRealVideo(prompt, qualityKey === "quality" ? QUALITY_VIDEO : FAST_VIDEO);
+  // 1) video real gratuit (LTX-Video, mișcare adevărată), apoi providerii plătiți
+  const real =
+    (await freeRealVideo(prompt, qualityKey)) ??
+    (await tryRealVideo(prompt, qualityKey === "quality" ? QUALITY_VIDEO : FAST_VIDEO));
+
   if (real) {
     return new Response(JSON.stringify({ videoUrl: real.url, model: real.label, prompt, kind: "real" }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
