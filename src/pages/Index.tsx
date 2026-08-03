@@ -442,8 +442,24 @@ const Index = () => {
         body: JSON.stringify({ prompt, quality, frames: videoFrames }),
       });
       const data = await resp.json();
-      if (!resp.ok || !Array.isArray(data?.frames) || data.frames.length < 2) {
-        throw new Error(data?.error || `HTTP ${resp.status}`);
+      if (!resp.ok) throw new Error(data?.error || `HTTP ${resp.status}`);
+
+      // Video real (mișcare adevărată) — vine direct ca fișier .mp4
+      if (typeof data?.videoUrl === "string") {
+        updateConv(convId!, (c) => ({
+          ...c,
+          updatedAt: Date.now(),
+          messages: c.messages.map((m) =>
+            m.id === assistantId
+              ? { ...m, content: "Iată videoclipul generat:", video: { url: data.videoUrl, prompt } }
+              : m,
+          ),
+        }));
+        return;
+      }
+
+      if (!Array.isArray(data?.frames) || data.frames.length < 2) {
+        throw new Error(data?.error || "Răspuns video invalid");
       }
 
       updateConv(convId!, (c) => ({
@@ -458,6 +474,7 @@ const Index = () => {
         secondsPerFrame: data.secondsPerFrame ?? 1.6,
         fps: data.fps ?? 24,
       });
+
       updateConv(convId!, (c) => ({
         ...c,
         updatedAt: Date.now(),
