@@ -1,7 +1,7 @@
-// Generare video prin Lovable AI (fără provider extern, fără chei suplimentare).
-// Strategie: modelul de imagini Gemini (Nano Banana) generează keyframe-uri
-// coerente între ele, iar aplicația le asamblează într-un clip real (WebM)
-// cu interpolare/crossfade în browser.
+// Generare video REALĂ (text→video, mișcare adevărată) prin Hugging Face
+// Inference Providers (routerul HF, folosind HF_TOKEN existent).
+// Dacă niciun provider video nu răspunde (credit HF epuizat etc.), cădem
+// elegant pe vechea strategie cu keyframe-uri Gemini asamblate în browser.
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -11,29 +11,210 @@ const corsHeaders = {
 };
 
 const LOVABLE_API_KEY = Deno.env.get("LOVABLE_API_KEY");
+const HF_TOKEN = Deno.env.get("HF_TOKEN");
+const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
+const SERVICE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 const GATEWAY = "https://ai.gateway.lovable.dev/v1/chat/completions";
+const HF_ROUTER = "https://router.huggingface.co";
 
-// Modele de imagine disponibile pe Lovable AI
 const IMAGE_MODELS: Record<string, string> = {
   fast: "google/gemini-3.1-flash-image",
   quality: "google/gemini-3-pro-image",
   banana: "google/gemini-2.5-flash-image",
 };
 
-interface Body {
-  prompt?: string;
-  quality?: string;
-  frames?: number;
+// Modele text→video reale, în ordinea de încercare.
+interface VideoModel {
+  label: string;
+  path: string;
+  body: (prompt: string) => unknown;
 }
+
+const FAST_VIDEO: VideoModel[] = [
+  {
+    label: "LTX-Video 0.9.8 13B distilled (fal)",
+    path: "/fal-ai/fal-ai/ltx-video-13b-distilled",
+    body: (prompt) => ({ prompt, aspect_ratio: "16:9" }),
+  },
+  {
+    label: "Wan 2.2 5B (fal)",
+    path: "/fal-ai/fal-ai/wan/v2.2-5b/text-to-video",
+    body: (prompt) => ({ prompt, resolution: "580p", aspect_ratio: "16:9" }),
+  },
+  {
+    label: "Wan 2.2 5B fast (replicate)",
+    path: "/replicate/v1/models/wan-video/wan-2.2-5b-fast/predictions",
+    body: (prompt) => ({ input: { prompt } }),
+  },
+];
+
+const QUALITY_VIDEO: VideoModel[] = [
+  {
+    label: "Wan 2.2 A14B (fal)",
+    path: "/fal-ai/fal-ai/wan/v2.2-a14b/text-to-video",
+    body: (prompt) => ({ prompt, resolution: "720p", aspect_ratio: "16:9" }),
+  },
+  ...FAST_VIDEO,
+];
+
+const hfHeaders = () => ({
+  Authorization: `Bearer ${HF_TOKEN}`,
+  "Content-Type": "application/json",
+});
+
+function findVideoUrl(obj: unknown, depth = 0): string | null {
+  if (depth > 6 || obj == null) return null;
+  if (typeof obj === "string") {
+    return /^https?:\/\/\S+\.(mp4|webm|mov)(\?|$)/i.test(obj) ? obj : null;
+  }
+  if (Array.isArray(obj)) {
+    for (const it of obj) {
+      const u = findVideoUrl(it, depth + 1);
+      if (u) return u;
+    }
+    return null;
+  }
+  if (typeof obj === "object") {
+    for (const v of Object.values(obj as Record<string, unknown>)) {
+      const u = findVideoUrl(v, depth + 1);
+      if (u) return u;
+    }
+  }
+  return null;
+}
+
+async function pollUrl(url: string, deadline: number): Promise<string | null> {
+  while (Date.now() < deadline) {
+    await new Promise((r) => setTimeout(r, 3000));
+    const r = await fetch(url, { headers: hfHeaders() });
+    const ct = r.headers.get("content-type") ?? "";
+    if (!r.ok) {
+      console.error("poll failed", r.status, (await r.text()).slice(0, 200));
+      return null;
+    }
+    if (!ct.includes("json")) return null;
+    const j = await r.json();
+    const status = (j.status ?? j.state ?? "").toString().toUpperCase();
+    if (status === "FAILED" || status === "CANCELED" || status === "ERROR") {
+      console.error("job failed", JSON.stringify(j).slice(0, 300));
+      return null;
+    }
+    const direct = findVideoUrl(j);
+    if (direct) return direct;
+    if (status === "COMPLETED" || status === "SUCCEEDED") {
+      // rezultatul poate fi la response_url
+      const rurl = j.response_url ?? j.urls?.get;
+      if (rurl && rurl !== url) {
+        const rr = await fetch(rurl, { headers: hfHeaders() });
+        if (rr.ok) {
+          const u = findVideoUrl(await rr.json());
+          if (u) return u;
+        }
+      }
+      return null;
+    }
+  }
+  return null;
+}
+
+async function tryRealVideo(prompt: string, models: VideoModel[]): Promise<{ url: string; label: string } | null> {
+  if (!HF_TOKEN) return null;
+  const deadline = Date.now() + 220_000;
+
+  for (const m of models) {
+    if (Date.now() > deadline - 20_000) break;
+    try {
+      const resp = await fetch(`${HF_ROUTER}${m.path}`, {
+        method: "POST",
+        headers: hfHeaders(),
+        body: JSON.stringify(m.body(prompt)),
+      });
+      const ct = resp.headers.get("content-type") ?? "";
+
+      if (!resp.ok) {
+        const t = await resp.text().catch(() => "");
+        console.error("video model rejected:", m.label, resp.status, t.slice(0, 200));
+        continue;
+      }
+
+      if (ct.startsWith("video/") || ct.includes("octet-stream")) {
+        const bytes = new Uint8Array(await resp.arrayBuffer());
+        const stored = await store(bytes, "video/mp4");
+        if (stored) return { url: stored, label: m.label };
+        continue;
+      }
+
+      const json = await resp.json();
+      let url = findVideoUrl(json);
+      if (!url) {
+        const statusUrl = json.status_url ?? json.urls?.get ?? json.response_url;
+        if (statusUrl) url = await pollUrl(statusUrl, deadline);
+      }
+      if (url) {
+        console.log("real video ready via", m.label);
+        const mirrored = await mirror(url);
+        return { url: mirrored ?? url, label: m.label };
+      }
+      console.error("no video in response:", m.label, JSON.stringify(json).slice(0, 300));
+    } catch (e) {
+      console.error("video model exception:", m.label, e);
+    }
+  }
+  return null;
+}
+
+async function store(bytes: Uint8Array, contentType: string): Promise<string | null> {
+  try {
+    const path = `gen/${crypto.randomUUID()}.mp4`;
+    const up = await fetch(`${SUPABASE_URL}/storage/v1/object/videos/${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        apikey: SERVICE_KEY,
+        "Content-Type": contentType,
+      },
+      body: bytes,
+    });
+    if (!up.ok) {
+      console.error("upload failed", up.status, (await up.text()).slice(0, 200));
+      return null;
+    }
+    const signed = await fetch(`${SUPABASE_URL}/storage/v1/object/sign/videos/${path}`, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${SERVICE_KEY}`,
+        apikey: SERVICE_KEY,
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({ expiresIn: 60 * 60 * 24 * 30 }),
+    });
+    if (!signed.ok) return null;
+    const { signedURL } = await signed.json();
+    return `${SUPABASE_URL}/storage/v1${signedURL}`;
+  } catch (e) {
+    console.error("store exception", e);
+    return null;
+  }
+}
+
+async function mirror(url: string): Promise<string | null> {
+  try {
+    const r = await fetch(url);
+    if (!r.ok) return null;
+    return await store(new Uint8Array(await r.arrayBuffer()), r.headers.get("content-type") ?? "video/mp4");
+  } catch (e) {
+    console.error("mirror exception", e);
+    return null;
+  }
+}
+
+/* ---------- fallback: keyframe-uri (vechea strategie) ---------- */
 
 async function shotList(prompt: string, count: number): Promise<string[]> {
   try {
     const resp = await fetch(GATEWAY, {
       method: "POST",
-      headers: {
-        Authorization: `Bearer ${LOVABLE_API_KEY}`,
-        "Content-Type": "application/json",
-      },
+      headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         model: "openai/gpt-5.6-sol",
         reasoning_effort: "none",
@@ -66,18 +247,13 @@ async function shotList(prompt: string, count: number): Promise<string[]> {
   }
 }
 
-async function genFrame(
-  model: string,
-  framePrompt: string,
-  previous: string | null,
-): Promise<string | null> {
+async function genFrame(model: string, framePrompt: string, previous: string | null): Promise<string | null> {
   const content: unknown[] = [];
   if (previous) {
     content.push({ type: "image_url", image_url: { url: previous } });
     content.push({
       type: "text",
-      text:
-        `Continue this exact scene as the NEXT video frame. Keep the same subject, style, colors and lighting; change only motion slightly. New frame: ${framePrompt}`,
+      text: `Continue this exact scene as the NEXT video frame. Keep the same subject, style, colors and lighting; change only motion slightly. New frame: ${framePrompt}`,
     });
   } else {
     content.push({ type: "text", text: framePrompt });
@@ -87,15 +263,8 @@ async function genFrame(
     try {
       const resp = await fetch(GATEWAY, {
         method: "POST",
-        headers: {
-          Authorization: `Bearer ${LOVABLE_API_KEY}`,
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          model,
-          messages: [{ role: "user", content }],
-          modalities: ["image", "text"],
-        }),
+        headers: { Authorization: `Bearer ${LOVABLE_API_KEY}`, "Content-Type": "application/json" },
+        body: JSON.stringify({ model, messages: [{ role: "user", content }], modalities: ["image", "text"] }),
       });
       if (!resp.ok) {
         const t = await resp.text().catch(() => "");
@@ -116,15 +285,14 @@ async function genFrame(
   return null;
 }
 
+interface Body {
+  prompt?: string;
+  quality?: string;
+  frames?: number;
+}
+
 Deno.serve(async (req) => {
   if (req.method === "OPTIONS") return new Response("ok", { headers: corsHeaders });
-
-  if (!LOVABLE_API_KEY) {
-    return new Response(JSON.stringify({ error: "LOVABLE_API_KEY nu este configurat" }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  }
 
   let body: Body;
   try {
@@ -145,6 +313,23 @@ Deno.serve(async (req) => {
   }
 
   const qualityKey = body.quality && IMAGE_MODELS[body.quality] ? body.quality : "fast";
+
+  // 1) încearcă video real (mișcare adevărată)
+  const real = await tryRealVideo(prompt, qualityKey === "quality" ? QUALITY_VIDEO : FAST_VIDEO);
+  if (real) {
+    return new Response(JSON.stringify({ videoUrl: real.url, model: real.label, prompt, kind: "real" }), {
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
+  // 2) fallback: keyframe-uri asamblate în browser
+  if (!LOVABLE_API_KEY) {
+    return new Response(JSON.stringify({ error: "Niciun provider video disponibil" }), {
+      status: 502,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
+  }
+
   const model = IMAGE_MODELS[qualityKey];
   const count = Math.max(2, Math.min(8, body.frames ?? (qualityKey === "quality" ? 6 : 4)));
 
@@ -152,7 +337,6 @@ Deno.serve(async (req) => {
     const prompts = await shotList(prompt, count);
     const frames: string[] = [];
     let previous: string | null = null;
-
     for (const p of prompts) {
       const url = await genFrame(model, p, previous);
       if (!url) continue;
@@ -161,14 +345,14 @@ Deno.serve(async (req) => {
     }
 
     if (frames.length < 2) {
-      return new Response(
-        JSON.stringify({ error: "Nu am putut genera suficiente cadre. Reîncearcă." }),
-        { status: 502, headers: { ...corsHeaders, "Content-Type": "application/json" } },
-      );
+      return new Response(JSON.stringify({ error: "Nu am putut genera video. Reîncearcă." }), {
+        status: 502,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      });
     }
 
     return new Response(
-      JSON.stringify({ frames, fps: 24, secondsPerFrame: 1.6, model, prompt }),
+      JSON.stringify({ frames, fps: 24, secondsPerFrame: 1.6, model, prompt, kind: "frames" }),
       { headers: { ...corsHeaders, "Content-Type": "application/json" } },
     );
   } catch (e) {
