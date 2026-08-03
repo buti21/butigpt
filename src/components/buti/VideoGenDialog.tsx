@@ -84,14 +84,14 @@ export const VideoGenDialog = ({ open, onOpenChange, onGenerate, isGenerating }:
             <div className="min-w-0">
               <Label className="text-sm">Model video</Label>
               <p className="text-[11px] text-muted-foreground">
-                {s.videoFrames} cadre ≈ {(s.videoFrames * 1.6).toFixed(1)}s • se schimbă în Setări → Voce
+                Video real (mișcare generată), nu slideshow
               </p>
             </div>
             <Select value={quality} onValueChange={(v) => setQuality(v as "fast" | "quality")} disabled={isGenerating}>
               <SelectTrigger className="w-36"><SelectValue /></SelectTrigger>
               <SelectContent>
-                <SelectItem value="fast">Rapid (Flash Image)</SelectItem>
-                <SelectItem value="quality">Cinematic (Pro Image)</SelectItem>
+                <SelectItem value="fast">Rapid (3s, 512p)</SelectItem>
+                <SelectItem value="quality">Cinematic (5s, 640p)</SelectItem>
               </SelectContent>
             </Select>
           </div>
@@ -108,8 +108,9 @@ export const VideoGenDialog = ({ open, onOpenChange, onGenerate, isGenerating }:
             )}
           </Button>
           <p className="text-[11px] text-muted-foreground text-center">
-            Generarea durează 30-90 secunde (cadre AI + montaj). Nu închide fila.
+            Generarea durează 30-90 secunde. Nu închide fila.
           </p>
+
         </div>
       </DialogContent>
     </Dialog>
