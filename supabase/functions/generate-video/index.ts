@@ -57,10 +57,97 @@ const QUALITY_VIDEO: VideoModel[] = [
   ...FAST_VIDEO,
 ];
 
+// --- Tier 1: generare video REALĂ gratuită (LTX-Video pe ZeroGPU) ---
+const SPACE = "https://Lightricks-ltx-video-distilled.hf.space/gradio_api";
+const NEG = "worst quality, inconsistent motion, blurry, jittery, distorted";
+
+async function freeRealVideo(
+  prompt: string,
+  quality: string,
+): Promise<{ url: string; label: string } | null> {
+  const hq = quality === "quality";
+  const duration = hq ? 5 : 3;
+  const h = hq ? 640 : 512;
+  const w = hq ? 896 : 704;
+
+  try {
+    const start = await fetch(`${SPACE}/call/text_to_video`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        data: [
+          prompt,
+          NEG,
+          null,
+          null,
+          h,
+          w,
+          "text-to-video",
+          duration,
+          9,
+          Math.floor(Math.random() * 1_000_000),
+          true,
+          1,
+          true,
+        ],
+      }),
+    });
+    if (!start.ok) {
+      console.error("space start failed", start.status, (await start.text()).slice(0, 200));
+      return null;
+    }
+    const { event_id } = await start.json();
+    if (!event_id) return null;
+
+    const stream = await fetch(`${SPACE}/call/text_to_video/${event_id}`);
+    if (!stream.ok || !stream.body) {
+      console.error("space stream failed", stream.status);
+      return null;
+    }
+    const reader = stream.body.getReader();
+    const dec = new TextDecoder();
+    let buf = "";
+    let videoUrl: string | null = null;
+
+    while (true) {
+      const { value, done } = await reader.read();
+      if (done) break;
+      buf += dec.decode(value, { stream: true });
+      const lines = buf.split("\n");
+      buf = lines.pop() ?? "";
+      for (const line of lines) {
+        if (line.startsWith("event: error")) {
+          console.error("space event error");
+          return null;
+        }
+        if (!line.startsWith("data: ")) continue;
+        try {
+          const payload = JSON.parse(line.slice(6));
+          const u = findVideoUrl(payload);
+          if (u) videoUrl = u;
+        } catch {
+          /* heartbeat */
+        }
+      }
+      if (videoUrl) break;
+    }
+    reader.cancel().catch(() => {});
+    if (!videoUrl) return null;
+
+    console.log("free real video ready:", videoUrl);
+    const mirrored = await mirror(videoUrl);
+    return { url: mirrored ?? videoUrl, label: "LTX-Video (real motion)" };
+  } catch (e) {
+    console.error("free video exception", e);
+    return null;
+  }
+}
+
 const hfHeaders = () => ({
   Authorization: `Bearer ${HF_TOKEN}`,
   "Content-Type": "application/json",
 });
+
 
 function findVideoUrl(obj: unknown, depth = 0): string | null {
   if (depth > 6 || obj == null) return null;
